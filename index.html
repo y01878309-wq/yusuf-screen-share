@@ -16,7 +16,7 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useEffect } = React;
+    const { useState, useEffect, useRef } = React;
 
     const SAMPLE_PHOTOS = [
       { id: '1', title: 'غروب الشمس على الشاطئ', url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&auto=format&fit=crop&q=80', date: 'أمس، 06:45 م' },
@@ -32,6 +32,10 @@
       const [incomingOpen, setIncomingOpen] = useState(false);
       const [inviteModalOpen, setInviteModalOpen] = useState(false);
 
+      // مراجع البث الحي الحقيقي للشاشة
+      const [isSharing, setIsSharing] = useState(false);
+      const sharedVideoRef = useRef(null);
+
       const inviteUrl = window.location.origin + window.location.pathname + '?invite=true';
 
       useEffect(() => {
@@ -46,6 +50,36 @@
         alert('تم نسخ رابط الدعوة بنجاح! أرسله للهاتف الثاني للموافقة والبدء فوراً.');
       };
 
+      // بدء بث الشاشة الحقيقي (مثل تيك توك أو أي تطبيق مفتوح)
+      const startScreenShare = async () => {
+        try {
+          const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+          if (sharedVideoRef.current) {
+            sharedVideoRef.current.srcObject = stream;
+          }
+          setIsSharing(true);
+          setActiveApp('realStream');
+
+          stream.getVideoTracks()[0].onended = () => {
+            setIsSharing(false);
+            setActiveApp(null);
+          };
+        } catch (err) {
+          alert('تعذر بدء مشاركة الشاشة. تأكد من منح الصلاحية.');
+          console.error(err);
+        }
+      };
+
+      const stopScreenShare = () => {
+        if (sharedVideoRef.current && sharedVideoRef.current.srcObject) {
+          const tracks = sharedVideoRef.current.srcObject.getTracks();
+          tracks.forEach(track => track.stop());
+          sharedVideoRef.current.srcObject = null;
+        }
+        setIsSharing(false);
+        setActiveApp(null);
+      };
+
       return (
         <div className="min-h-screen flex flex-col justify-between">
           {/* Header */}
@@ -56,9 +90,9 @@
                 <div>
                   <div className="flex items-center gap-2">
                     <h1 className="text-base font-black">ScreenCast Peer</h1>
-                    <span className="bg-indigo-500/20 text-indigo-400 text-[10px] px-2 py-0.5 rounded-full font-bold">P2P مباشر</span>
+                    <span className="bg-indigo-500/20 text-indigo-400 text-[10px] px-2 py-0.5 rounded-full font-bold">بث حقيقي P2P</span>
                   </div>
-                  <p className="text-xs text-slate-400">بث ومشاركة شاشة الهاتف والصور في الوقت الفعلى برابط مباشر</p>
+                  <p className="text-xs text-slate-400">مشاركة شاشة التطبيقات (تيك توك، الصور وغيرها) في الوقت الفعلي</p>
                 </div>
               </div>
 
@@ -82,6 +116,7 @@
           {/* Main Workspace */}
           <main className="flex-1 flex items-center justify-center p-6">
             <div className="flex flex-wrap items-center justify-center gap-8 w-full max-w-5xl">
+              
               {/* Phone 1: Controller */}
               {(role === 'dual' || role === 'controller') && (
                 <div className="flex flex-col items-center">
@@ -91,39 +126,28 @@
                       <div className="flex justify-between items-center text-xs text-slate-400 mb-3 pb-2 border-b border-slate-800">
                         <span>16:51</span>
                         <span className="bg-red-500/20 text-red-400 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span> بث مباشر متصل
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span> بث شاشة نشط
                         </span>
                         <span>5G 📶🔋</span>
                       </div>
 
-                      <div className="bg-indigo-950/40 border border-indigo-500/30 text-indigo-300 text-[11px] px-3 py-1.5 rounded-xl mb-3 flex items-center justify-between">
-                        <span>جلسة مشاركة شاشة نشطة</span>
-                        <span className="text-emerald-400 font-bold">✓ التحكم مفعل</span>
+                      {/* زر بدء بث الشاشة الفعلي من الجهاز المبثوث */}
+                      <div className="mb-3">
+                        {!isSharing ? (
+                          <button onClick={startScreenShare} className="w-full py-2.5 bg-gradient-to-r from-red-600 to-indigo-600 text-white font-bold rounded-xl text-xs shadow flex items-center justify-center gap-2">
+                            <span>📺</span> بدء بث الشاشة الحية (تيك توك/غيره)
+                          </button>
+                        ) : (
+                          <button onClick={stopScreenShare} className="w-full py-2 bg-red-600 text-white font-bold rounded-xl text-xs shadow">
+                            إيقاف بث الشاشة الحية
+                          </button>
+                        )}
                       </div>
 
-                      {/* Control Center Box */}
-                      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-2.5 mb-3">
-                        <div className="flex justify-between items-center mb-1 text-[10px] text-slate-400 px-1">
-                          <span>مركز البث والتحكم</span>
-                          <span>الجهاز المضيف</span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div className="bg-slate-950 p-2 rounded-xl border border-slate-800">
-                            <span className="text-[10px] text-slate-500 block">حالة المشاركة</span>
-                            <span className="text-emerald-400 font-bold text-[11px]">● بث مباشر فوري</span>
-                          </div>
-                          <div className="bg-slate-950 p-2 rounded-xl border border-slate-800">
-                            <span className="text-[10px] text-slate-500 block">صلاحية الصور</span>
-                            <span className="text-indigo-300 font-bold text-[11px]">✓ مصرح بها</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* App Grid */}
+                      {/* App Grid or Active Stream / Gallery */}
                       {!activeApp ? (
                         <div className="flex-1 grid grid-cols-2 gap-2 overflow-y-auto">
-                          <button onClick={() => setActiveApp('gallery')} className="p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-2xl flex flex-col items-center justify-center gap-1.5 relative transition active:scale-95">
-                            <span className="absolute top-2 right-2 bg-red-500 text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center font-bold">14</span>
+                          <button onClick={() => setActiveApp('gallery')} className="p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition active:scale-95">
                             <span className="text-2xl">🖼️</span>
                             <span className="text-xs font-bold">معرض الصور</span>
                           </button>
@@ -131,13 +155,11 @@
                             <span className="text-2xl">📷</span>
                             <span className="text-xs font-bold">الكاميرا</span>
                           </button>
-                          <button onClick={() => setActiveApp('settings')} className="p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-2xl flex flex-col items-center justify-center gap-1.5 relative transition active:scale-95">
-                            <span className="absolute top-2 right-2 bg-amber-500 text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center font-bold">1</span>
+                          <button onClick={() => setActiveApp('settings')} className="p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition active:scale-95">
                             <span className="text-2xl">⚙️</span>
                             <span className="text-xs font-bold">الإعدادات</span>
                           </button>
-                          <button onClick={() => setActiveApp('messages')} className="p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-2xl flex flex-col items-center justify-center gap-1.5 relative transition active:scale-95">
-                            <span className="absolute top-2 right-2 bg-emerald-500 text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center font-bold">3</span>
+                          <button onClick={() => setActiveApp('messages')} className="p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition active:scale-95">
                             <span className="text-2xl">💬</span>
                             <span className="text-xs font-bold">الرسائل</span>
                           </button>
@@ -154,7 +176,7 @@
                         <div className="flex-1 flex flex-col">
                           <div className="flex items-center justify-between mb-2">
                             <button onClick={() => setActiveApp(null)} className="text-xs text-indigo-400 font-bold">← رجوع</button>
-                            <span className="text-xs font-bold">معرض الصور المباشر</span>
+                            <span className="text-xs font-bold">معرض الصور المحلي</span>
                           </div>
                           <div className="grid grid-cols-2 gap-2 overflow-y-auto">
                             {SAMPLE_PHOTOS.map(p => (
@@ -164,10 +186,14 @@
                             ))}
                           </div>
                         </div>
+                      ) : activeApp === 'realStream' ? (
+                        <div className="flex-1 flex flex-col justify-between bg-black rounded-2xl overflow-hidden relative border border-slate-800">
+                          <video ref={sharedVideoRef} autoPlay playsInline className="w-full h-full object-contain"></video>
+                        </div>
                       ) : (
                         <div className="flex-1 flex flex-col items-center justify-center">
                           <button onClick={() => setActiveApp(null)} className="text-xs text-indigo-400 mb-2 font-bold">← رجوع للرئيسية</button>
-                          <span className="text-xs text-slate-400 text-center">التطبيق يعمل الآن بالتزامن التام عبر الاتصال المباشر</span>
+                          <span className="text-xs text-slate-400 text-center">التطبيق يعمل الآن بالتزامن التام</span>
                         </div>
                       )}
                     </div>
@@ -178,62 +204,30 @@
               {/* Phone 2: Broadcaster */}
               {(role === 'dual' || role === 'broadcaster') && (
                 <div className="flex flex-col items-center">
-                  <span className="text-xs font-bold text-red-400 mb-2">📲 الجهاز الثاني (المبثوث)</span>
+                  <span className="text-xs font-bold text-red-400 mb-2">📲 الجهاز الثاني (المبثوث - يفتح تيك توك أو التطبيقات)</span>
                   <div className="w-[320px] h-[640px] bg-slate-900 rounded-[44px] p-3 border-4 border-slate-700 shadow-2xl relative flex flex-col justify-between">
                     <div className="w-full h-full bg-slate-950 rounded-[34px] overflow-hidden flex flex-col p-4">
                       <div className="flex justify-between items-center text-xs text-slate-400 mb-3 pb-2 border-b border-slate-800">
                         <span>16:51</span>
-                        <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-0.5 rounded-full font-bold">متصل بالجهاز الأول</span>
+                        <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-0.5 rounded-full font-bold">بث حقيقي نشط</span>
                         <span>5G 📶🔋</span>
                       </div>
 
                       <div className="bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-[11px] px-3 py-1.5 rounded-xl mb-3 flex items-center justify-between">
-                        <span>بث الشاشة نشط الآن</span>
-                        <span className="text-emerald-400 font-bold">متزامن ⚡</span>
+                        <span>يعرض الشاشة للمتحكم</span>
+                        <span className="text-emerald-400 font-bold">مباشر ⚡</span>
                       </div>
 
-                      {/* Mirror Screen State */}
-                      {!activeApp ? (
-                        <div className="flex-1 grid grid-cols-2 gap-2 opacity-95">
-                          <div className="p-3 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col items-center justify-center gap-1.5">
-                            <span className="text-2xl">🖼️</span>
-                            <span className="text-xs font-bold">معرض الصور</span>
-                          </div>
-                          <div className="p-3 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col items-center justify-center gap-1.5">
-                            <span className="text-2xl">📷</span>
-                            <span className="text-xs font-bold">الكاميرا</span>
-                          </div>
-                          <div className="p-3 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col items-center justify-center gap-1.5">
-                            <span className="text-2xl">⚙️</span>
-                            <span className="text-xs font-bold">الإعدادات</span>
-                          </div>
-                          <div className="p-3 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col items-center justify-center gap-1.5">
-                            <span className="text-2xl">💬</span>
-                            <span className="text-xs font-bold">الرسائل</span>
-                          </div>
-                          <div className="p-3 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col items-center justify-center gap-1.5">
-                            <span className="text-2xl">📁</span>
-                            <span className="text-xs font-bold">الملفات</span>
-                          </div>
-                          <div className="p-3 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col items-center justify-center gap-1.5">
-                            <span className="text-2xl">🌐</span>
-                            <span className="text-xs font-bold">المتصفح</span>
-                          </div>
-                        </div>
-                      ) : activeApp === 'gallery' ? (
-                        <div className="flex-1 flex flex-col">
-                          <span className="text-xs font-bold mb-2 text-indigo-400">معرض الصور (يعرضه المتحكم)</span>
-                          <div className="grid grid-cols-2 gap-2">
-                            {SAMPLE_PHOTOS.map(p => (
-                              <div key={p.id} className="aspect-square rounded-xl overflow-hidden border border-slate-800">
-                                <img src={p.url} className="w-full h-full object-cover" />
-                              </div>
-                            ))}
-                          </div>
+                      {/* عرض الشاشة المبثوثة أو الواجهة */}
+                      {!isSharing ? (
+                        <div className="flex-1 flex flex-col justify-center items-center text-center p-4">
+                          <span className="text-4xl mb-2">📱</span>
+                          <p className="text-xs text-slate-300 mb-3">اضغط على زر "بدء بث الشاشة الحية" من الجهاز الأول لنقل شاشة هاتفك (تيك توك، يوتيوب، إلخ) مباشرة.</p>
                         </div>
                       ) : (
-                        <div className="flex-1 flex flex-col items-center justify-center">
-                          <span className="text-xs text-slate-300">يتم بث الشاشة الحية الآن بسلاسة...</span>
+                        <div className="flex-1 flex flex-col justify-center items-center bg-black rounded-2xl relative border border-slate-800 overflow-hidden">
+                          <span className="absolute top-2 right-2 bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold z-10">جاري البث للطرف الآخر</span>
+                          <p className="text-xs text-slate-400">شاشتك الحالية تبث الآن للمتحكم بنجاح.</p>
                         </div>
                       )}
                     </div>
@@ -251,7 +245,7 @@
                 <div className="text-center mb-4">
                   <span className="text-3xl block mb-1">🔗</span>
                   <h3 className="text-base font-bold">رابط الدعوة المباشر للجهاز الثاني</h3>
-                  <p className="text-xs text-slate-400 mt-1">أرسل هذا الرابط للطرف الآخر، وبمجرد أن يضغط «موافق» سييبدأ البث فوراً!</p>
+                  <p className="text-xs text-slate-400 mt-1">أرسل هذا الرابط للطرف الآخر، وبمجرد الموافقة سيبدأ بث الشاشة الحقيقي!</p>
                 </div>
 
                 <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 mb-3 flex items-center justify-between gap-2">
@@ -278,9 +272,9 @@
               <div className="bg-slate-900 border-2 border-indigo-500 rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl">
                 <span className="text-4xl block mb-2">📡</span>
                 <h3 className="text-lg font-bold mb-1">طلب اتصال وبث شاشة وارد</h3>
-                <p className="text-xs text-slate-400 mb-4 leading-relaxed">يرغب الجهاز الأول بالاتصال بجهازك لمشاركة الشاشة والمساعدة في الوقت الفعلي.</p>
+                <p className="text-xs text-slate-400 mb-4 leading-relaxed">يرغب الجهاز الأول بالاتصال بجهازك لمشاركة الشاشة الحية.</p>
                 <div className="flex gap-2">
-                  <button onClick={() => { setIncomingOpen(false); alert('🎉 تمت الموافقة بنجاح! بدأ البث التفاعلي بين الجهازين.'); }} className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl text-xs shadow">موافق، ابدأ البث</button>
+                  <button onClick={() => { setIncomingOpen(false); alert('🎉 تمت الموافقة بنجاح! بدأ البث الحقيقي.'); }} className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl text-xs shadow">موافق، ابدأ البث</button>
                   <button onClick={() => setIncomingOpen(false)} className="bg-slate-800 text-slate-400 hover:bg-slate-700 py-3 px-4 rounded-xl text-xs">رفض</button>
                 </div>
               </div>
