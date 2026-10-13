@@ -3,268 +3,252 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ScreenCast Enterprise P2P & Full Remote Control Mega | يوسف فرج</title>
+  <title>ScreenCast PeerJS Live Mirror | يوسف فرج</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- مكتبة PeerJS للاتصال الحقيقي المباشر بين الأجهزة عبر الإنترنت -->
+  <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap');
     body { font-family: 'Cairo', sans-serif; background-color: #020617; color: #f8fafc; }
     .neon-border { border: 1px solid rgba(99, 102, 241, 0.4); box-shadow: 0 0 35px rgba(99, 102, 241, 0.25); }
     .glass-box { background: rgba(15, 23, 42, 0.92); backdrop-filter: blur(16px); }
-    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-    .custom-scrollbar::-webkit-scrollbar-track { background: #020617; }
-    .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col selection:bg-indigo-600 selection:text-white">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
   <div id="root" class="flex-1 flex flex-col"></div>
 
   <script type="text/babel">
     const { useState, useEffect, useRef } = React;
 
-    // مصفوفة سجلات وموديولات أمان إضافية لضمان عمق الكود وبرمجياته المتقدمة
-    const SYSTEM_MODULES_DB = [
-      { id: 'm1', name: 'WebRTC Signaling Core', status: 'Active', latency: '12ms' },
-      { id: 'm2', name: 'DataChannel Remote Bridge', status: 'Synced', latency: '8ms' },
-      { id: 'm3', name: 'AES-GCM 256-bit Encryption', status: 'Secure', latency: '0ms' },
-      { id: 'm4', name: 'Isolated Room Allocator', status: 'Locked', latency: '4ms' }
-    ];
-
     function App() {
       const [roomId, setRoomId] = useState('');
+      const [peerId, setPeerId] = useState('جاري الاتصال بالشبكة...');
+      const [remotePeerId, setRemotePeerId] = useState('');
+      const [connectionStatus, setConnectionStatus] = useState('في انتظار الانضمام للغرفة...');
       const [isStreaming, setIsStreaming] = useState(false);
-      const [statusText, setStatusText] = useState('جاهز للاتصال المباشر الآمن عبر P2P');
-      const [remoteLog, setRemoteLog] = useState('لا توجد أوامر تحكم واردة بعد في هذه الجلسة');
-      const [commandHistory, setCommandHistory] = useState([
-        '[SYS_INIT] Loading Enterprise Remote Mirroring Engine...',
-        '[SECURE_TUNNEL] RSA-4096 and AES-GCM encryption verified.'
-      ]);
-      const [activeTab, setActiveTab] = useState('mirror');
 
+      const peerRef = useRef(null);
+      const localStreamRef = useRef(null);
       const localVideoRef = useRef(null);
       const remoteVideoRef = useRef(null);
-      const mediaStreamRef = useRef(null);
+      const currentCallRef = useRef(null);
 
-      // توليد أو جلب معرف الغرفة الفريدة المعزولة
       useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         let currentRoom = params.get('room');
+        
         if (!currentRoom) {
-          currentRoom = 'room_enterprise_p2p_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now().toString(36);
+          currentRoom = 'youssef_room_' + Math.random().toString(36).substring(2, 8);
           const newUrl = window.location.origin + window.location.pathname + '?room=' + currentRoom;
           window.history.replaceState({ room: currentRoom }, '', newUrl);
         }
         setRoomId(currentRoom);
-        appendLog(`[ROOM_ALLOC] Assigned to unique isolated room ID: ${currentRoom}`);
+
+        // إنشاء كينونة PeerJS باستخدام معرف الغرفة لضمان اتصال الجهازين ببعض
+        const peer = new Peer(currentRoom, {
+          config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }] }
+        });
+
+        peer.on('open', (id) => {
+          setPeerId(id);
+          setConnectionStatus('متصل بشبكة الإشارة وجاهز للبث');
+        });
+
+        // استقبال المكالمة والبث من الجهاز الآخر تلقائياً
+        peer.on('call', (call) => {
+          setConnectionStatus('جاري استلام البث الشاشي من الجهاز الثاني...');
+          navigator.mediaDevices.getUserMedia({ video: true, audio: true }).catch(() => null).then(() => {
+            call.answer(); // الرد على المكالمة بدون كاميرا محلية للمستقبل
+            call.on('stream', (remoteStream) => {
+              if (remoteVideoRef.current) {
+                remoteVideoRef.current.srcObject = remoteStream;
+                setConnectionStatus('✓ الشاشة الرئيسية معروضة بنجاح وبث مباشر نشط!');
+                setIsStreaming(true);
+              }
+            });
+          });
+          currentCallRef.current = call;
+        });
+
+        peer.on('error', (err) => {
+          console.error(err);
+          // إذا كان معرف الغرفة مأخوذ (الجهاز الأول موجود)، نحاول الاتصال به كعميل
+          if (err.type === 'unavailable-id') {
+            setConnectionStatus('الغرفة نشطة بالفعل، جاري الاتصال بالجهاز المُضيف...');
+            connectToHost(currentRoom);
+          } else {
+            setConnectionStatus('خطأ في الشبكة: ' + err.type);
+          }
+        });
+
+        peerRef.current = peer;
+
+        return () => {
+          peer.destroy();
+        };
       }, []);
 
-      const appendLog = (msg) => {
-        setCommandHistory(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
-      };
+      // الاتصال بالمضيف (الجهاز الأول)
+      const connectToHost = (hostId) => {
+        const peer = peerRef.current;
+        if (!peer) return;
 
-      // بدء مشاركة الشاشة الحقيقية عبر getDisplayMedia للبث الحي
-      const startRealScreenBroadcast = async () => {
-        try {
-          setStatusText('جاري طلب إذن مشاركة الشاشة من المتصفح...');
-          appendLog('[MEDIA] Requesting getDisplayMedia stream...');
-
-          const stream = await navigator.mediaDevices.getDisplayMedia({
-            video: { cursor: "always", frameRate: 60, width: { ideal: 1920 }, height: { ideal: 1080 } },
-            audio: true
-          });
-
-          mediaStreamRef.current = stream;
+        navigator.mediaDevices.getDisplayMedia({ video: { cursor: "always" }, audio: true }).then((stream) => {
+          localStreamRef.current = stream;
           if (localVideoRef.current) {
             localVideoRef.current.srcObject = stream;
           }
 
-          setIsStreaming(true);
-          setStatusText('بث الشاشة الحقيقي نشط وآمن داخل الغرفة المعزولة');
-          appendLog('[SUCCESS] Real screen mirroring stream started successfully.');
+          setConnectionStatus('جاري إرسال الشاشة الرئيسية للجهاز الآخر...');
+          const call = peer.call(hostId, stream);
+          
+          call.on('stream', (remoteStream) => {
+            if (remoteVideoRef.current) {
+              remoteVideoRef.current.srcObject = remoteStream;
+            }
+          });
 
-          // مراقبة إيقاف البث يدوياً من واجهة المتصفح
+          setIsStreaming(true);
+          setConnectionStatus('✓ تم بدء بث الشاشة الرئيسية بنجاح!');
+
           stream.getVideoTracks()[0].onended = () => {
-            stopRealScreenBroadcast();
+            stopBroadcast();
           };
-        } catch (error) {
-          console.error("Error accessing display media:", error);
-          setStatusText('تم إلغاء إذن المشاركة أو تعذر بدء البث');
-          appendLog(`[ERROR] Failed to start screen broadcast: ${error.message}`);
-        }
+        }).catch(err => {
+          console.error(err);
+          setConnectionStatus('تم إلغاء إذن مشاركة الشاشة.');
+        });
       };
 
-      // إيقاف البث الحي
-      const stopRealScreenBroadcast = () => {
-        if (mediaStreamRef.current) {
-          mediaStreamRef.current.getTracks().forEach(track => track.stop());
-          mediaStreamRef.current = null;
-        }
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = null;
+      // بدء مشاركة الشاشة يدوياً لمن يفتح الرابط
+      const startManualBroadcast = () => {
+        const params = new URLSearchParams(window.location.search);
+        let hostId = params.get('room');
+        // إذا كان هناك جهاز آخر نتصل به، أو نبدأ كمضيف وننتظر
+        navigator.mediaDevices.getDisplayMedia({ video: { cursor: "always" }, audio: true }).then((stream) => {
+          localStreamRef.current = stream;
+          if (localVideoRef.current) {
+            localVideoRef.current.srcObject = stream;
+          }
+          setIsStreaming(true);
+          setConnectionStatus('✓ شاشتك قيد البث وجاهزة للظهور عند الطرف الآخر.');
+
+          // لو فيه شخص متصل بينا نبعتله البث
+          if (peerRef.current) {
+            peerRef.current.on('call', (call) => {
+              call.answer(stream);
+            });
+          }
+
+          stream.getVideoTracks()[0].onended = () => {
+            stopBroadcast();
+          };
+        }).catch(err => {
+          alert('يرجى السماح بمشاركة الشاشة لبدء البث.');
+        });
+      };
+
+      const stopBroadcast = () => {
+        if (localStreamRef.current) {
+          localStreamRef.current.getTracks().forEach(t => t.stop());
+          localStreamRef.current = null;
         }
         setIsStreaming(false);
-        setStatusText('تم إيقاف البث الحي للشاشة');
-        appendLog('[STOP] Screen broadcast terminated by user.');
-      };
-
-      // إرسال أمر تحكم تفاعلي من الجهاز الأول (المتحكم) إلى الجهاز الثاني
-      const sendControlCommand = (commandType, payload) => {
-        const fullCommand = `[CMD] ${commandType} -> ${payload}`;
-        setRemoteLog(fullCommand);
-        appendLog(`[REMOTE_CTRL] Sent command: ${commandType} with payload: ${payload}`);
+        setConnectionStatus('تم إيقاف البث.');
       };
 
       const inviteUrl = window.location.origin + window.location.pathname + '?room=' + roomId;
 
-      const copyInviteLink = () => {
+      const copyInvite = () => {
         navigator.clipboard.writeText(inviteUrl);
-        alert('تم نسخ رابط الغرفة الفريدة المعزولة بنجاح!');
-        appendLog('[ACTION] Unique room invite link copied to clipboard.');
+        alert('تم نسخ رابط الغرفة الفريدة بنجاح!');
       };
 
       return (
         <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100">
           
-          {/* Header الاحترافي الفاخر */}
+          {/* Header */}
           <header className="glass-box border-b border-slate-800 p-4 sticky top-0 z-50">
             <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center gap-3.5">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-600 flex items-center justify-center font-bold text-2xl shadow-lg neon-border">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-indigo-600 flex items-center justify-center font-bold text-xl shadow-lg neon-border">
                   🛰️
                 </div>
                 <div>
-                  <h1 className="text-base font-black tracking-wider text-white">ScreenCast P2P & Full Remote Control Mega</h1>
-                  <p className="text-xs text-slate-400">هندسة البرمجيات وتأمين البث: <strong className="text-indigo-300">يوسف فرج</strong></p>
+                  <h1 className="text-sm font-black text-white">ScreenCast PeerJS Live Mirror</h1>
+                  <p className="text-xs text-slate-400">هندسة: <strong className="text-indigo-300">يوسف فرج</strong></p>
                 </div>
               </div>
 
-              {/* أزرار التبديل والتحكم بالواجهة */}
-              <div className="flex items-center bg-slate-900 p-1 rounded-2xl border border-slate-800">
-                <button onClick={() => setActiveTab('mirror')} className={`px-4 py-2 rounded-xl text-xs font-bold transition ${activeTab === 'mirror' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}>البث والتحكم</button>
-                <button onClick={() => setActiveTab('diagnostics')} className={`px-4 py-2 rounded-xl text-xs font-bold transition ${activeTab === 'diagnostics' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}>تشخيص الكيرنل</button>
-              </div>
-
               <div className="flex items-center gap-3">
-                <span className="bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-xs px-3 py-1.5 rounded-full font-bold">
-                  الغرفة: {roomId.substring(0, 14)}...
+                <span className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs px-3 py-1.5 rounded-full font-bold">
+                  الغرفة: {roomId}
                 </span>
-                <button onClick={copyInviteLink} className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-4 py-2 rounded-xl font-bold shadow transition">
-                  🔗 نسخ رابط الغرفة
+                <button onClick={copyInvite} className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-4 py-2 rounded-xl font-bold shadow">
+                  🔗 نسخ الرابط
                 </button>
               </div>
             </div>
           </header>
 
-          {/* Telemetry & Status Bar */}
+          {/* Status Bar */}
           <div className="bg-slate-900/60 border-b border-slate-900 px-6 py-2">
-            <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between text-xs font-mono text-slate-400 gap-4">
-              <div>حالة الاتصال المباشر: <strong className="text-emerald-400">{statusText}</strong></div>
-              <div>بروتوكول البث: <strong className="text-indigo-300">WebRTC getDisplayMedia + DataChannel</strong></div>
-              <div>التشفير: <strong className="text-emerald-400">AES-GCM 256-bit</strong></div>
+            <div className="max-w-7xl mx-auto flex items-center justify-between text-xs font-mono text-slate-400">
+              <div>حالة الاتصال الفعلي: <strong className="text-emerald-400">{connectionStatus}</strong></div>
+              <div>معرف الجهاز: <strong className="text-indigo-300">{peerId}</strong></div>
             </div>
           </div>
 
-          {/* محتوى الصفحة الرئيسي */}
-          <main className="flex-1 flex items-center justify-center p-6 lg:p-10">
-            {activeTab === 'mirror' ? (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 w-full max-w-6xl">
-                
-                {/* الجهاز الثاني: المبثوث (يشارك شاشة هاتفه ويستقبل أوامر التحكم) */}
-                <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 flex flex-col shadow-2xl">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-bold text-emerald-400">📲 الجهاز الثاني (المبثوث - شاشة الهاتف الأصلية)</span>
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                  </div>
-
-                  <div className="w-[360px] h-[380px] mx-auto bg-black rounded-2xl overflow-hidden relative border border-slate-800 flex items-center justify-center">
-                    <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-contain"></video>
-                    {!isStreaming && (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 p-6 text-center">
-                        <span className="text-4xl mb-3">📡</span>
-                        <p className="text-xs text-slate-300 mb-4">اضغط لبدء بث شاشة هاتفك الحقيقية لتظهر فوراً عند الجهاز الأول.</p>
-                        <button onClick={startRealScreenBroadcast} className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-6 py-3 rounded-xl font-bold shadow-lg transition">
-                          بدء بث الشاشة الحقيقي
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* سجل استلام أوامر التحكم عن بُعد */}
-                  <div className="mt-4 bg-slate-950 p-3.5 rounded-xl border border-slate-800 font-mono text-[11px]">
-                    <span className="text-slate-400 block mb-1">سجل أوامر التحكم الواردة من الجهاز المتحكم:</span>
-                    <span className="text-indigo-300 font-bold">{remoteLog}</span>
-                  </div>
+          {/* Main Workspace */}
+          <main className="flex-1 flex items-center justify-center p-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 w-full max-w-5xl">
+              
+              {/* شاشة هاتفك (المرسل) */}
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 flex flex-col shadow-xl">
+                <div className="flex justify-between items-center mb-3">
+                  <span className="text-xs font-bold text-indigo-400">📱 شاشة هاتفك (المصدر للبث)</span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse"></span>
                 </div>
 
-                {/* الجهاز الأول: المتحكم (يعرض البث الحي ويتحكم في الجهاز الثاني عن بُعد) */}
-                <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 flex flex-col shadow-2xl">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-bold text-indigo-400">🕹️ الجهاز الأول (المتحكم والمشاهد الرئيسي)</span>
-                    <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse"></span>
-                  </div>
-
-                  <div className="w-[360px] h-[380px] mx-auto bg-black rounded-2xl overflow-hidden relative border border-slate-800 flex items-center justify-center">
-                    <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-contain"></video>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 p-6 text-center pointer-events-none">
-                      <span className="text-4xl mb-3">🖥️</span>
-                      <p className="text-xs text-slate-400">ستظهر شاشة الهاتف الثاني هنا لحظياً، ويمكنك إرسال أوامر التحكم بالأسفل.</p>
-                    </div>
-                  </div>
-
-                  {/* لوحة أزرار التحكم التفاعلي عن بُعد */}
-                  <div className="mt-4 bg-slate-950 p-3.5 rounded-xl border border-slate-800 flex flex-col gap-2.5">
-                    <span className="text-xs font-bold text-slate-300">لوحة التحكم التفاعلي في الهاتف الثاني:</span>
-                    <div className="grid grid-cols-3 gap-2">
-                      <button onClick={() => sendControlCommand('TOUCH_CLICK', 'X:200, Y:450')} className="bg-slate-900 hover:bg-indigo-600/30 border border-slate-800 py-2.5 rounded-xl text-xs font-bold transition">
-                        👆 ضغطة (Tap)
-                      </button>
-                      <button onClick={() => sendControlCommand('SWIPE_SCROLL', 'Direction: DOWN')} className="bg-slate-900 hover:bg-indigo-600/30 border border-slate-800 py-2.5 rounded-xl text-xs font-bold transition">
-                        📜 سحب (Scroll)
-                      </button>
-                      <button onClick={() => sendControlCommand('SYSTEM_HOME', 'Action: HOME')} className="bg-slate-900 hover:bg-indigo-600/30 border border-slate-800 py-2.5 rounded-xl text-xs font-bold transition">
-                        🏠 الشاشة الرئيسية
+                <div className="w-full h-[360px] bg-black rounded-2xl overflow-hidden relative border border-slate-800 flex items-center justify-center">
+                  <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-contain"></video>
+                  {!isStreaming && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 p-6 text-center">
+                      <span className="text-4xl mb-3">📡</span>
+                      <p className="text-xs text-slate-300 mb-4">اضغط هنا لبدء بث شاشتك الحقيقية لتظهر مباشرة عند الجهاز الثاني.</p>
+                      <button onClick={startManualBroadcast} className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-6 py-3 rounded-xl font-bold shadow-lg transition">
+                        بدء بث الشاشة الحقيقي
                       </button>
                     </div>
-                  </div>
+                  )}
                 </div>
-
               </div>
-            ) : (
-              <div className="w-full max-w-4xl bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col gap-6">
-                <div className="flex justify-between items-center border-b border-slate-800 pb-4">
-                  <h3 className="text-sm font-bold text-white">تشخيص وحدات الكيرنل وسجلات الاتصال المباشر</h3>
-                  <span className="text-xs text-emerald-400 font-mono">System Integrity: 100%</span>
+
+              {/* الشاشة الرئيسية المستقبلة (التي تعرض تليفون الطرف الآخر) */}
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 flex flex-col shadow-xl">
+                <div className="flex justify-between items-center mb-3">
+                  <span className="text-xs font-bold text-emerald-400">💻 الشاشة الرئيسية (تظهر هنا شاشة الطرف الآخر)</span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {SYSTEM_MODULES_DB.map(mod => (
-                    <div key={mod.id} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex items-center justify-between">
-                      <div>
-                        <p className="text-xs font-bold text-slate-200">{mod.name}</p>
-                        <span className="text-[10px] text-slate-500 font-mono">الحالة: {mod.status}</span>
-                      </div>
-                      <span className="text-xs font-mono text-emerald-400 font-bold">{mod.latency}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <span className="text-xs font-bold text-slate-400">سجلات النظام الحية (Terminal Logs):</span>
-                  <div className="bg-black p-4 rounded-2xl border border-slate-800 font-mono text-[11px] text-emerald-400 h-48 overflow-y-auto custom-scrollbar flex flex-col gap-1.5">
-                    {commandHistory.map((log, index) => (
-                      <span key={index}>{log}</span>
-                    ))}
+                <div className="w-full h-[360px] bg-black rounded-2xl overflow-hidden relative border border-slate-800 flex items-center justify-center">
+                  <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-contain"></video>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 p-6 text-center pointer-events-none">
+                    <span className="text-4xl mb-3">🖥️</span>
+                    <p className="text-xs text-slate-400">ستظهر شاشة الهاتف الرئيسي للطرف الآخر هنا فور اتصاله بالغرفة.</p>
                   </div>
                 </div>
               </div>
-            )}
+
+            </div>
           </main>
 
           {/* Footer */}
           <footer className="glass-box border-t border-slate-800 p-4 text-center text-xs text-slate-400">
-            هندسة وبطولات البث المباشر والتحكم عن بُعد: <strong className="text-white">يوسف فرج</strong> | خبير أمن وحماية الويب
+            تطوير وهندسة الاتصال المباشر: <strong className="text-white">يوسف فرج</strong>
           </footer>
 
         </div>
