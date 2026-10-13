@@ -3,20 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ScreenCast AnyDesk Pro | يوسف فرج</title>
+  <title>AnyDesk Web | يوسف فرج</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap');
-    body { font-family: 'Cairo', sans-serif; background-color: #020617; color: #f8fafc; }
-    .neon-border { border: 1px solid rgba(99, 102, 241, 0.4); box-shadow: 0 0 35px rgba(99, 102, 241, 0.25); }
-    .glass-box { background: rgba(15, 23, 42, 0.92); backdrop-filter: blur(16px); }
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
+    body { font-family: 'Cairo', sans-serif; background-color: #0f1115; color: #f8fafc; }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
+<body class="min-h-screen flex flex-col">
   <div id="root" class="flex-1 flex flex-col"></div>
 
   <script type="text/babel">
@@ -24,11 +22,8 @@
 
     function App() {
       const [myId, setMyId] = useState('');
-      const [targetId, setTargetId] = useState('');
+      const [remoteInput, setRemoteInput] = useState('');
       const [status, setStatus] = useState('جاري الاتصال بالسيرفر...');
-      const [isStreaming, setIsStreaming] = useState(false);
-
-      // نافذة الموافقة/الرفض للاتصال الوارد
       const [incomingCall, setIncomingCall] = useState(null);
       const [showModal, setShowModal] = useState(false);
 
@@ -37,13 +32,11 @@
       const localStreamRef = useRef(null);
       const remoteVideoRef = useRef(null);
 
-      // إعدادات الاتصال المباشر (STUN)
       const rtcConfig = {
         iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
       };
 
       useEffect(() => {
-        // الاتصال بسيرفر Railway الخاص بك
         const socket = io('https://Yusuf-screen-share-production-fc10.up.railway.app');
         socketRef.current = socket;
 
@@ -51,32 +44,27 @@
           const generatedId = Math.floor(100 + Math.random() * 900) + ' ' + Math.floor(100 + Math.random() * 900) + ' ' + Math.floor(100 + Math.random() * 900);
           setMyId(generatedId);
           socket.emit('register_id', generatedId);
-          setStatus('جاهز للاتصال. اكتب رقم الجهاز الآخر أو شارك رقمك.');
+          setStatus('جاهز. أدخل رقم الطرف الآخر بالأسفل.');
         });
 
-        // استقبال طلب اتصال (Offer)
         socket.on('incoming_offer', async ({ from, offer }) => {
-          setStatus(`⚠️ طلب اتصال وارد من الجهاز: ${from}`);
+          setStatus(`طلب اتصال وارد من: ${from}`);
           setIncomingCall({ from, offer });
           setShowModal(true);
         });
 
-        // استقبال الرد (Answer)
         socket.on('incoming_answer', async ({ answer }) => {
           if (pcRef.current) {
             await pcRef.current.setRemoteDescription(new RTCSessionDescription(answer));
-            setStatus('✓ تم ربط الاتصال وبدء البث بنجاح تام!');
+            setStatus('تم الاتصال بنجاح وعرض الشاشة!');
           }
         });
 
-        // استقبال مرشح الشبكة (ICE Candidate)
         socket.on('incoming_candidate', async ({ candidate }) => {
           if (pcRef.current && candidate) {
             try {
               await pcRef.current.addIceCandidate(new RTCIceCandidate(candidate));
-            } catch (e) {
-              console.error(e);
-            }
+            } catch (e) { console.error(e); }
           }
         });
 
@@ -96,7 +84,7 @@
         pc.ontrack = (e) => {
           if (remoteVideoRef.current && e.streams[0]) {
             remoteVideoRef.current.srcObject = e.streams[0];
-            setStatus('✓ شاشة الجهاز البعيد تظهر الآن بوضوح!');
+            setStatus('تتم الآن مشاهدة الشاشة بنجاح!');
           }
         };
 
@@ -110,8 +98,8 @@
         return pc;
       };
 
-      // بدء مشاركة الشاشة أو الكاميرا محلياً للبث للطرف الآخر
-      const startMedia = async () => {
+      const startCapture = async () => {
+        if (localStreamRef.current) return localStreamRef.current;
         try {
           let stream;
           try {
@@ -119,41 +107,32 @@
           } catch (e) {
             stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
           }
-
           localStreamRef.current = stream;
-          setIsStreaming(true);
-          setStatus('✓ تم تفعيل البث بنجاح. اكتب رقم الجهاز واضغط اتصال.');
+          return stream;
         } catch (err) {
-          alert('تعذر الحصول على إذن البث من المتصفح.');
-          setStatus('فشل إذن البث.');
+          alert('تعذر الحصول على صلاحية مشاركة الشاشة أو الكاميرا.');
+          throw err;
         }
       };
 
-      // الاتصال بجهاز آخر عن طريق رقمه
-      const connectToDevice = async () => {
-        const cleanTarget = targetId.trim();
-        if (!cleanTarget) return alert('اكتب رقم الجهاز المستهدف أولاً!');
-        if (!localStreamRef.current) {
-          await startMedia();
-        }
-
-        setStatus(`جاري الاتصال بالجهاز: ${cleanTarget}...`);
-        const pc = createPeerConnection(cleanTarget);
+      const handleConnect = async () => {
+        const cleanId = remoteInput.trim();
+        if (!cleanId) return alert('الرجاء إدخال رقم العنوان المطلوب!');
         
+        setStatus('جاري تجهيز البث والاتصال...');
+        await startCapture();
+
+        const pc = createPeerConnection(cleanId);
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
 
-        socketRef.current.emit('send_offer', { target: cleanTarget, from: myId, offer });
+        socketRef.current.emit('send_offer', { target: cleanId, from: myId, offer });
       };
 
-      // قبول الاتصال الوارد من الطرف الثاني
       const acceptCall = async () => {
         setShowModal(false);
-        setStatus('جاري قبول الاتصال وبدء البث...');
-
-        if (!localStreamRef.current) {
-          await startMedia();
-        }
+        setStatus('جاري بدء المشاركة والقبول...');
+        await startCapture();
 
         const pc = createPeerConnection(incomingCall.from);
         await pc.setRemoteDescription(new RTCSessionDescription(incomingCall.offer));
@@ -162,91 +141,75 @@
         await pc.setLocalDescription(answer);
 
         socketRef.current.emit('send_answer', { target: incomingCall.from, answer });
-        setStatus('✓ تم الاتصال وعرض الشاشة بنجاح!');
+        setStatus('متصل ويتم بث الشاشة الآن.');
       };
 
       const rejectCall = () => {
         setShowModal(false);
         setIncomingCall(null);
-        setStatus('❌ تم رفض طلب الاتصال.');
+        setStatus('تم رفض الاتصال.');
       };
 
       return (
-        <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 relative p-4">
+        <div className="min-h-screen flex flex-col bg-[#161922] text-slate-100 p-4">
           
-          {/* نافذة الموافقة والرفض للاتصال */}
+          {/* نافذة الموافقة */}
           {showModal && (
-            <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-              <div className="bg-slate-900 border border-indigo-500/50 p-6 rounded-3xl max-w-sm w-full shadow-2xl flex flex-col gap-4 text-center neon-border">
-                <div className="w-14 h-14 bg-indigo-600/20 border border-indigo-500 rounded-2xl mx-auto flex items-center justify-center text-2xl">
-                  📞
-                </div>
-                <div>
-                  <h3 className="text-sm font-black text-white mb-1">طلب اتصال وبث شاشة جديد!</h3>
-                  <p className="text-xs text-slate-400">الجهاز رقم ({incomingCall?.from}) يريد الاتصال بك. هل توافق؟</p>
-                </div>
-                <div className="grid grid-cols-2 gap-3 mt-2">
-                  <button onClick={rejectCall} className="bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs py-3 rounded-xl font-bold transition">
-                    ❌ رفض
-                  </button>
-                  <button onClick={acceptCall} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs py-3 rounded-xl font-bold transition shadow-lg">
-                    ✓ موافقة وبث
-                  </button>
+            <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+              <div className="bg-[#1e222d] border border-red-500/40 p-6 rounded-2xl max-w-sm w-full shadow-2xl flex flex-col gap-4 text-center">
+                <div className="text-xl font-bold text-white">طلب اتصال وارد</div>
+                <p className="text-xs text-slate-300">الجهاز ({incomingCall?.from}) يطلب الاتصال بك وعرض الشاشة.</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <button onClick={rejectCall} className="bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white py-2.5 rounded-xl font-bold text-xs transition">رفض</button>
+                  <button onClick={acceptCall} className="bg-green-600 hover:bg-green-500 text-white py-2.5 rounded-xl font-bold text-xs transition">قبول</button>
                 </div>
               </div>
             </div>
           )}
 
-          <header className="glass-box p-4 rounded-2xl mb-4 flex flex-col items-center text-center gap-2">
-            <h1 className="text-sm font-black text-white">ScreenCast AnyDesk Pro</h1>
-            <p className="text-[10px] text-slate-400">هندسة: <strong className="text-indigo-300">يوسف فرج</strong></p>
-            <div className="mt-2 bg-slate-950 px-4 py-2 rounded-xl border border-indigo-500/30 w-full max-w-xs">
-              <span className="text-[10px] text-slate-400 block mb-1">عنوان جهازك (Your Address):</span>
-              <span className="text-base font-black font-mono text-emerald-400 tracking-wider">{myId || 'جاري التوليد...'}</span>
+          {/* شريط الإدخال الرئيسي مثل AnyDesk */}
+          <header className="w-full max-w-xl mx-auto mb-6 flex flex-col gap-4">
+            <div className="bg-[#1e222d] rounded-2xl p-4 shadow-xl border border-slate-800 flex items-center gap-2">
+              <svg className="w-6 h-6 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+              <input 
+                type="text" 
+                placeholder="Enter Remote Address" 
+                value={remoteInput}
+                onChange={(e) => setRemoteInput(e.target.value)}
+                className="w-full bg-transparent text-white font-mono text-base tracking-widest placeholder-slate-500 focus:outline-none text-center"
+              />
+              <button onClick={handleConnect} className="bg-red-600 hover:bg-red-500 text-white px-5 py-2.5 rounded-xl font-bold text-xs tracking-wider shrink-0 transition shadow-lg">
+                اتصال
+              </button>
+            </div>
+
+            {/* خانة Your Address */}
+            <div className="bg-[#1e222d] rounded-2xl p-6 shadow-xl border border-slate-800 text-center flex flex-col items-center">
+              <span className="text-xs text-slate-400 font-semibold mb-1">Your Address</span>
+              <div className="text-3xl sm:text-4xl font-black font-mono text-red-500 tracking-wider my-1">
+                {myId || 'جاري التحميل...'}
+              </div>
+              <span className="text-[11px] text-slate-500 mt-2">شارك هذا الرقم مع الجهاز الآخر ليتصل بك</span>
             </div>
           </header>
 
-          <div className="bg-slate-900 p-3 rounded-xl mb-4 text-xs text-center font-mono text-indigo-300 border border-slate-800">
-            الحالة: {status}
+          {/* حالة الاتصال */}
+          <div className="w-full max-w-xl mx-auto mb-4 bg-[#1e222d]/60 border border-slate-800 py-2 px-4 rounded-xl text-center text-xs text-slate-300 font-mono">
+            {status}
           </div>
 
-          <main className="flex flex-col gap-4 max-w-xl mx-auto w-full mb-6">
-            <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 flex flex-col gap-3 shadow-xl">
-              <span className="text-xs font-bold text-slate-300">التحكم والاتصال المباشر:</span>
-              <div className="flex gap-2">
-                <input 
-                  type="text" 
-                  placeholder="أدخل رقم الجهاز (مثال: 123 456 789)..." 
-                  value={targetId} 
-                  onChange={e => setTargetId(e.target.value)} 
-                  className="flex-1 bg-slate-950 border border-slate-800 px-3 py-2.5 rounded-xl text-xs text-white font-mono focus:outline-none focus:border-indigo-500 text-center tracking-widest"
-                />
-                <button onClick={connectToDevice} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-5 py-2.5 rounded-xl font-bold transition shadow">
-                  🚀 اتصال
-                </button>
-              </div>
-
-              {!isStreaming && (
-                <button onClick={startMedia} className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs py-2.5 rounded-xl font-bold transition shadow">
-                  📡 تفعيل البث محلياً أولاً (اختياري)
-                </button>
-              )}
-            </div>
-
-            {/* الشاشة المستقبلة فقط */}
-            <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 flex flex-col shadow-xl">
-              <span className="text-xs font-bold text-emerald-400 mb-2">💻 شاشة العرض (الطرف الآخر)</span>
-              <div className="w-full h-80 bg-black rounded-xl overflow-hidden relative border border-slate-800 flex items-center justify-center">
-                <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-contain"></video>
-                <div className="absolute inset-0 flex items-center justify-center bg-slate-950/80 p-2 text-center text-[11px] text-slate-400 pointer-events-none">
-                  ستظهر شاشة الجهاز الآخر هنا فور إتمام الاتصال.
-                </div>
+          {/* شاشة العرض الأساسية */}
+          <main className="w-full max-w-xl mx-auto flex-1 flex flex-col mb-4">
+            <div className="bg-[#1e222d] border border-slate-800 rounded-2xl overflow-hidden shadow-2xl relative flex-1 min-h-[320px] flex items-center justify-center">
+              <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-contain"></video>
+              <div className="absolute inset-0 flex items-center justify-center bg-[#161922]/90 p-4 text-center text-xs text-slate-500 pointer-events-none" style={{ opacity: remoteVideoRef.current?.srcObject ? 0 : 1 }}>
+                ستظهر شاشة الطرف الآخر هنا مباشرة فور الاتصال.
               </div>
             </div>
           </main>
 
-          <footer className="glass-box p-4 rounded-2xl text-center text-xs text-slate-400 mt-auto">
-            التطوير النهائي الشامل: <strong className="text-white">يوسف فرج</strong>
+          <footer className="text-center text-[10px] text-slate-600 pb-2">
+            AnyDesk Web Engine | تصميم وتطوير: يوسف فرج
           </footer>
 
         </div>
