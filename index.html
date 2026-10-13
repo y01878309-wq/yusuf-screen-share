@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ScreenCast Ultimate Pro | يوسف فرج</title>
+  <title>ScreenCast AnyDesk Pro | يوسف فرج</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -23,13 +23,13 @@
     const { useState, useEffect, useRef } = React;
 
     function App() {
-      const [roomId, setRoomId] = useState('');
-      const [inputRoom, setInputRoom] = useState('');
-      const [status, setStatus] = useState('جاري الاتصال بسيرفر الإشارة...');
+      const [myId, setMyId] = useState('');
+      const [targetId, setTargetId] = useState('');
+      const [status, setStatus] = useState('جاري الاتصال بالسيرفر...');
       const [isStreaming, setIsStreaming] = useState(false);
 
-      // نافذة الموافقة/الرفض للطرف الثاني
-      const [incomingCallData, setIncomingCallData] = useState(null);
+      // نافذة الموافقة/الرفض للاتصال الوارد
+      const [incomingCall, setIncomingCall] = useState(null);
       const [showModal, setShowModal] = useState(false);
 
       const socketRef = useRef(null);
@@ -38,35 +38,40 @@
       const localVideoRef = useRef(null);
       const remoteVideoRef = useRef(null);
 
+      // إعدادات الاتصال المباشر (STUN)
+      const rtcConfig = {
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      };
+
       useEffect(() => {
-        // تم التعديل هنا لربط السيرفر الجديد على Railway بنجاح
+        // الاتصال بسيرفر Railway الخاص بك
         const socket = io('https://Yusuf-screen-share-production-fc10.up.railway.app');
         socketRef.current = socket;
 
         socket.on('connect', () => {
-          setStatus('متصل بنجاح بالسيرفر. أنشئ غرفة أو انضم لغرفة.');
+          const generatedId = Math.floor(100 + Math.random() * 900) + ' ' + Math.floor(100 + Math.random() * 900) + ' ' + Math.floor(100 + Math.random() * 900);
+          setMyId(generatedId);
+          socket.emit('register_id', generatedId);
+          setStatus('جاهز للاتصال. اكتب رقم الجهاز الآخر أو شارك رقمك.');
         });
 
-        socket.on('joined', (room) => {
-          setRoomId(room);
-          setStatus(`✓ انضممت للغرفة بنجاح: ${room}`);
-        });
-
-        // استقبال الطلب وإظهار نافذة الموافقة أو الرفض
-        socket.on('offer', async (offer) => {
-          setStatus('⚠️ يوجد طلب اتصال وبث وارد...');
-          setIncomingCallData(offer);
+        // استقبال طلب اتصال (Offer)
+        socket.on('incoming_offer', async ({ from, offer }) => {
+          setStatus(`⚠️ طلب اتصال وارد من الجهاز: ${from}`);
+          setIncomingCall({ from, offer });
           setShowModal(true);
         });
 
-        socket.on('answer', async (answer) => {
+        // استقبال الرد (Answer)
+        socket.on('incoming_answer', async ({ answer }) => {
           if (pcRef.current) {
             await pcRef.current.setRemoteDescription(new RTCSessionDescription(answer));
-            setStatus('✓ تم ربط الاتصال وعرض الشاشة بنجاح تام!');
+            setStatus('✓ تم ربط الاتصال وبدء البث بنجاح تام!');
           }
         });
 
-        socket.on('candidate', async (candidate) => {
+        // استقبال مرشح الشبكة (ICE Candidate)
+        socket.on('incoming_candidate', async ({ candidate }) => {
           if (pcRef.current && candidate) {
             try {
               await pcRef.current.addIceCandidate(new RTCIceCandidate(candidate));
@@ -79,22 +84,20 @@
         return () => socket.disconnect();
       }, []);
 
-      const createPeerConnection = () => {
+      const createPeerConnection = (receiverId) => {
         if (pcRef.current) return pcRef.current;
-        const pc = new RTCPeerConnection({
-          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-        });
+        const pc = new RTCPeerConnection(rtcConfig);
 
         pc.onicecandidate = (e) => {
           if (e.candidate && socketRef.current) {
-            socketRef.current.emit('candidate', { room: roomId, candidate: e.candidate });
+            socketRef.current.emit('send_candidate', { target: receiverId, candidate: e.candidate });
           }
         };
 
         pc.ontrack = (e) => {
           if (remoteVideoRef.current && e.streams[0]) {
             remoteVideoRef.current.srcObject = e.streams[0];
-            setStatus('✓ تظهر شاشة الطرف الآخر الآن بوضوح!');
+            setStatus('✓ شاشة الجهاز البعيد تظهر الآن بوضوح!');
           }
         };
 
@@ -108,22 +111,7 @@
         return pc;
       };
 
-      const createRoom = () => {
-        const r = 'room_' + Math.random().toString(36).substring(2, 7);
-        setRoomId(r);
-        socketRef.current.emit('join', r);
-      };
-
-      const joinRoom = () => {
-        if (!inputRoom.trim()) {
-          alert('اكتب اسم الغرفة أولاً!');
-          return;
-        }
-        setRoomId(inputRoom.trim());
-        socketRef.current.emit('join', inputRoom.trim());
-      };
-
-      // بدء مشاركة الشاشة محلياً مع بديل الكاميرا لو المتصفح منعها
+      // بدء مشاركة الشاشة محلياً (مع دعم الكاميرا كبديل للموبايل)
       const startMedia = async () => {
         try {
           let stream;
@@ -138,121 +126,113 @@
             localVideoRef.current.srcObject = stream;
           }
           setIsStreaming(true);
-          setStatus('✓ الشاشة المحلية جاهزة. اضغط إرسال الطلب للغرفة.');
-
+          setStatus('✓ الشاشة المحلية جاهزة. اكتب رقم الجهاز واضغط اتصال.');
         } catch (err) {
           alert('تعذر الحصول على إذن البث من المتصفح.');
-          setStatus('فشل الإذن.');
+          setStatus('فشل إذن البث.');
         }
       };
 
-      // إرسال الطلب للغرفة
-      const sendOfferToRoom = async () => {
-        if (!roomId) return alert('يجب أن تنشئ أو تنضم لغرفة أولاً!');
-        if (!localStreamRef.current) return alert('اضغط على بدء البث المحلي أولاً!');
+      // الاتصال بجهاز آخر عن طريق رقمه (AnyDesk style)
+      const connectToDevice = async () => {
+        const cleanTarget = targetId.trim();
+        if (!cleanTarget) return alert('اكتب رقم الجهاز المستهدف أولاً!');
+        if (!localStreamRef.current) {
+          await startMedia();
+        }
 
-        setStatus('جاري إرسال طلب الاتصال للغرفة...');
-        const pc = createPeerConnection();
+        setStatus(`جاري الاتصال بالجهاز: ${cleanTarget}...`);
+        const pc = createPeerConnection(cleanTarget);
+        
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
-        socketRef.current.emit('offer', { room: roomId, offer });
+
+        socketRef.current.emit('send_offer', { target: cleanTarget, from: myId, offer });
       };
 
-      // زر موافقة الطرف الثاني على الطلب الوارد
+      // قبول الاتصال الوارد من الطرف الثاني
       const acceptCall = async () => {
         setShowModal(false);
-        setStatus('جاري قبول الاتصال...');
+        setStatus('جاري قبول الاتصال وبدء البث...');
 
-        const pc = createPeerConnection();
-        await pc.setRemoteDescription(new RTCSessionDescription(incomingCallData));
-        
-        // لو الطرف الثاني عنده بث محلي، يضيفه
-        if (localStreamRef.current) {
-          localStreamRef.current.getTracks().forEach(track => {
-            pc.addTrack(track, localStreamRef.current);
-          });
+        if (!localStreamRef.current) {
+          await startMedia();
         }
+
+        const pc = createPeerConnection(incomingCall.from);
+        await pc.setRemoteDescription(new RTCSessionDescription(incomingCall.offer));
 
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
-        socketRef.current.emit('answer', { room: roomId, answer });
-        setStatus('✓ تم قبول الاتصال وبث الشاشة بنجاح!');
+
+        socketRef.current.emit('send_answer', { target: incomingCall.from, answer });
+        setStatus('✓ تم الاتصال وعرض الشاشة بنجاح!');
       };
 
-      // زر رفض الطلب الوارد
       const rejectCall = () => {
         setShowModal(false);
-        setIncomingCallData(null);
-        setStatus('❌ تم رفض طلب الاتصال الوارد.');
+        setIncomingCall(null);
+        setStatus('❌ تم رفض طلب الاتصال.');
       };
 
       return (
         <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 relative p-4">
           
-          {/* نافذة الموافقة والرفض المنبثقة */}
+          {/* نافذة الموافقة والرفض للاتصال */}
           {showModal && (
             <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
               <div className="bg-slate-900 border border-indigo-500/50 p-6 rounded-3xl max-w-sm w-full shadow-2xl flex flex-col gap-4 text-center neon-border">
                 <div className="w-14 h-14 bg-indigo-600/20 border border-indigo-500 rounded-2xl mx-auto flex items-center justify-center text-2xl">
-                  🔔
+                  📞
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-white mb-1">طلب اتصال وبث شاشة وارد!</h3>
-                  <p className="text-xs text-slate-400">هناك جهاز يحاول مشاركة الشاشة معك في الغرفة. هل توافق؟</p>
+                  <h3 className="text-sm font-black text-white mb-1">طلب اتصال وبث شاشة جديد!</h3>
+                  <p className="text-xs text-slate-400">الجهاز رقم ({incomingCall?.from}) يريد الاتصال بك وعرض الشاشة. هل توافق؟</p>
                 </div>
                 <div className="grid grid-cols-2 gap-3 mt-2">
                   <button onClick={rejectCall} className="bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs py-3 rounded-xl font-bold transition">
                     ❌ رفض
                   </button>
                   <button onClick={acceptCall} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs py-3 rounded-xl font-bold transition shadow-lg">
-                    ✓ موافقة
+                    ✓ موافقة وبث
                   </button>
                 </div>
               </div>
             </div>
           )}
 
-          <header className="glass-box p-4 rounded-2xl mb-4 flex flex-wrap justify-between items-center gap-2">
-            <div>
-              <h1 className="text-xs font-black text-white">ScreenCast Ultimate Pro</h1>
-              <p className="text-[10px] text-slate-400">هندسة: <strong className="text-indigo-300">يوسف فرج</strong></p>
+          <header className="glass-box p-4 rounded-2xl mb-4 flex flex-col items-center text-center gap-2">
+            <h1 className="text-sm font-black text-white">ScreenCast AnyDesk Pro</h1>
+            <p className="text-[10px] text-slate-400">هندسة: <strong className="text-indigo-300">يوسف فرج</strong></p>
+            <div className="mt-2 bg-slate-950 px-4 py-2 rounded-xl border border-indigo-500/30 w-full max-w-xs">
+              <span className="text-[10px] text-slate-400 block mb-1">عنوان جهازك (Your Address):</span>
+              <span className="text-base font-black font-mono text-emerald-400 tracking-wider">{myId || 'جاري التوليد...'}</span>
             </div>
-            <span className="text-xs bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 px-3 py-1.5 rounded-xl font-mono">
-              الغرفة: {roomId || 'غير متصل'}
-            </span>
           </header>
 
-          <div className="bg-slate-900 p-3 rounded-xl mb-4 text-xs text-center font-mono text-emerald-400 border border-slate-800">
+          <div className="bg-slate-900 p-3 rounded-xl mb-4 text-xs text-center font-mono text-indigo-300 border border-slate-800">
             الحالة: {status}
           </div>
 
           <main className="flex flex-col gap-4 max-w-xl mx-auto w-full mb-6">
             <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 flex flex-col gap-3 shadow-xl">
-              <button onClick={createRoom} className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs py-3 rounded-xl font-bold transition shadow">
-                ✨ إنشاء غرفة جديدة
-              </button>
+              <span className="text-xs font-bold text-slate-300">التحكم والاتصال المباشر:</span>
               <div className="flex gap-2">
                 <input 
                   type="text" 
-                  placeholder="اكتب اسم الغرفة للانضمام..." 
-                  value={inputRoom} 
-                  onChange={e => setInputRoom(e.target.value)} 
-                  className="flex-1 bg-slate-950 border border-slate-800 px-3 py-2.5 rounded-xl text-xs text-white font-mono focus:outline-none focus:border-indigo-500"
+                  placeholder="أدخل رقم الجهاز (مثال: 123 456 789)..." 
+                  value={targetId} 
+                  onChange={e => setTargetId(e.target.value)} 
+                  className="flex-1 bg-slate-950 border border-slate-800 px-3 py-2.5 rounded-xl text-xs text-white font-mono focus:outline-none focus:border-indigo-500 text-center tracking-widest"
                 />
-                <button onClick={joinRoom} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-5 py-2.5 rounded-xl font-bold transition shadow">
-                  🔗 انضمام
+                <button onClick={connectToDevice} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-5 py-2.5 rounded-xl font-bold transition shadow">
+                  🚀 اتصال وبث
                 </button>
               </div>
 
-              {roomId && !isStreaming && (
-                <button onClick={startMedia} className="bg-amber-600 hover:bg-amber-500 text-white text-xs py-3 rounded-xl font-bold transition shadow">
-                  📡 الخطوة 1: بدء البث المحلي أولاً
-                </button>
-              )}
-
-              {roomId && isStreaming && (
-                <button onClick={sendOfferToRoom} className="bg-rose-600 hover:bg-rose-500 text-white text-xs py-3 rounded-xl font-bold transition shadow-lg animate-pulse">
-                  🚀 الخطوة 2: إرسال الطلب للغرفة
+              {!isStreaming && (
+                <button onClick={startMedia} className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs py-2.5 rounded-xl font-bold transition shadow">
+                  📡 تفعيل الشاشة/الكاميرا محلياً أولاً
                 </button>
               )}
             </div>
@@ -264,18 +244,18 @@
                   <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-contain"></video>
                   {!isStreaming && (
                     <div className="absolute inset-0 flex items-center justify-center bg-slate-950/80 p-2 text-center text-[11px] text-slate-400">
-                      اضغط "بدء البث المحلي" لتظهر شاشتك هنا.
+                      اضغط زر التفعيل لتظهر شاشتك هنا.
                     </div>
                   )}
                 </div>
               </div>
 
               <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 flex flex-col shadow-xl">
-                <span className="text-xs font-bold text-emerald-400 mb-2">💻 الشاشة المستقبِلة</span>
+                <span className="text-xs font-bold text-emerald-400 mb-2">💻 الشاشة المستقبِلة (الطرف الآخر)</span>
                 <div className="w-full h-56 bg-black rounded-xl overflow-hidden relative border border-slate-800 flex items-center justify-center">
                   <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-contain"></video>
                   <div className="absolute inset-0 flex items-center justify-center bg-slate-950/80 p-2 text-center text-[11px] text-slate-400">
-                    ستظهر شاشة الطرف الآخر هنا بعد قبول الطلب.
+                    ستظهر شاشة الجهاز الآخر هنا فور الاتصال.
                   </div>
                 </div>
               </div>
