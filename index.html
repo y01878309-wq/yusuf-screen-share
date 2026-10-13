@@ -35,7 +35,6 @@
       const socketRef = useRef(null);
       const pcRef = useRef(null);
       const localStreamRef = useRef(null);
-      const localVideoRef = useRef(null);
       const remoteVideoRef = useRef(null);
 
       // إعدادات الاتصال المباشر (STUN)
@@ -111,7 +110,7 @@
         return pc;
       };
 
-      // بدء مشاركة الشاشة محلياً (مع دعم الكاميرا كبديل للموبايل)
+      // بدء مشاركة الشاشة أو الكاميرا محلياً للبث للطرف الآخر
       const startMedia = async () => {
         try {
           let stream;
@@ -122,18 +121,15 @@
           }
 
           localStreamRef.current = stream;
-          if (localVideoRef.current) {
-            localVideoRef.current.srcObject = stream;
-          }
           setIsStreaming(true);
-          setStatus('✓ الشاشة المحلية جاهزة. اكتب رقم الجهاز واضغط اتصال.');
+          setStatus('✓ تم تفعيل البث بنجاح. اكتب رقم الجهاز واضغط اتصال.');
         } catch (err) {
           alert('تعذر الحصول على إذن البث من المتصفح.');
           setStatus('فشل إذن البث.');
         }
       };
 
-      // الاتصال بجهاز آخر عن طريق رقمه (AnyDesk style)
+      // الاتصال بجهاز آخر عن طريق رقمه
       const connectToDevice = async () => {
         const cleanTarget = targetId.trim();
         if (!cleanTarget) return alert('اكتب رقم الجهاز المستهدف أولاً!');
@@ -187,7 +183,7 @@
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-white mb-1">طلب اتصال وبث شاشة جديد!</h3>
-                  <p className="text-xs text-slate-400">الجهاز رقم ({incomingCall?.from}) يريد الاتصال بك وعرض الشاشة. هل توافق؟</p>
+                  <p className="text-xs text-slate-400">الجهاز رقم ({incomingCall?.from}) يريد الاتصال بك. هل توافق؟</p>
                 </div>
                 <div className="grid grid-cols-2 gap-3 mt-2">
                   <button onClick={rejectCall} className="bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs py-3 rounded-xl font-bold transition">
@@ -226,37 +222,24 @@
                   className="flex-1 bg-slate-950 border border-slate-800 px-3 py-2.5 rounded-xl text-xs text-white font-mono focus:outline-none focus:border-indigo-500 text-center tracking-widest"
                 />
                 <button onClick={connectToDevice} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-5 py-2.5 rounded-xl font-bold transition shadow">
-                  🚀 اتصال وبث
+                  🚀 اتصال
                 </button>
               </div>
 
               {!isStreaming && (
                 <button onClick={startMedia} className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs py-2.5 rounded-xl font-bold transition shadow">
-                  📡 تفعيل الشاشة/الكاميرا محلياً أولاً
+                  📡 تفعيل البث محلياً أولاً (اختياري)
                 </button>
               )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
-              <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 flex flex-col shadow-xl">
-                <span className="text-xs font-bold text-indigo-400 mb-2">📱 شاشتك المحلية</span>
-                <div className="w-full h-56 bg-black rounded-xl overflow-hidden relative border border-slate-800 flex items-center justify-center">
-                  <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-contain"></video>
-                  {!isStreaming && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-slate-950/80 p-2 text-center text-[11px] text-slate-400">
-                      اضغط زر التفعيل لتظهر شاشتك هنا.
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 flex flex-col shadow-xl">
-                <span className="text-xs font-bold text-emerald-400 mb-2">💻 الشاشة المستقبِلة (الطرف الآخر)</span>
-                <div className="w-full h-56 bg-black rounded-xl overflow-hidden relative border border-slate-800 flex items-center justify-center">
-                  <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-contain"></video>
-                  <div className="absolute inset-0 flex items-center justify-center bg-slate-950/80 p-2 text-center text-[11px] text-slate-400">
-                    ستظهر شاشة الجهاز الآخر هنا فور الاتصال.
-                  </div>
+            {/* الشاشة المستقبلة فقط */}
+            <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 flex flex-col shadow-xl">
+              <span className="text-xs font-bold text-emerald-400 mb-2">💻 شاشة العرض (الطرف الآخر)</span>
+              <div className="w-full h-80 bg-black rounded-xl overflow-hidden relative border border-slate-800 flex items-center justify-center">
+                <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-contain"></video>
+                <div className="absolute inset-0 flex items-center justify-center bg-slate-950/80 p-2 text-center text-[11px] text-slate-400 pointer-events-none">
+                  ستظهر شاشة الجهاز الآخر هنا فور إتمام الاتصال.
                 </div>
               </div>
             </div>
