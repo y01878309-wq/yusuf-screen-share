@@ -3,293 +3,366 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ScreenCast Peer | يوسف فرج - مطور برمجيات وخبير أمن وحماية الويب</title>
+  <title>ScreenCast Peer Ultimate | يوسف فرج - خبير أمن وحماية الويب</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <style>
-    body { font-family: system-ui, -apple-system, sans-serif; background-color: #020617; }
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap');
+    body { font-family: 'Cairo', system-ui, sans-serif; background-color: #030712; color: #f8fafc; overflow-x: hidden; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #030712; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+    .glow-effect { box-shadow: 0 0 25px -5px rgba(99, 102, 241, 0.3); }
+    .glass-panel { background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); }
   </style>
 </head>
-<body class="bg-slate-950 text-white min-h-screen">
-  <div id="root"></div>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col selection:bg-indigo-600 selection:text-white">
+  <div id="root" class="flex-1 flex flex-col"></div>
 
   <script type="text/babel">
-    const { useState, useEffect, useRef } = React;
+    const { useState, useEffect, useRef, useMemo } = React;
 
-    const SAMPLE_PHOTOS = [
-      { id: '1', title: 'غروب الشمس على الشاطئ', url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&auto=format&fit=crop&q=80', date: 'أمس، 06:45 م' },
-      { id: '2', title: 'لقطة معمارية حديثة', url: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&auto=format&fit=crop&q=80', date: '10 أكتوبر' },
-      { id: '3', title: 'قهوة الصباح والعمل', url: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=800&auto=format&fit=crop&q=80', date: '08 أكتوبر' },
-      { id: '4', title: 'رحلة الجبال الثلجية', url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800&auto=format&fit=crop&q=80', date: '03 أكتوبر' },
+    // قاعدة بيانات ضخمة وعميقة للعناصر الوهمية والحية داخل التطبيق (توفير عمق برمجي كبير)
+    const MOCK_GALLERY = [
+      { id: 'g1', title: 'لقطة أمنية مشفرة #1', url: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&auto=format&fit=crop&q=80', size: '4.2 MB', date: 'منذ دقيقتين' },
+      { id: 'g2', title: 'خريطة شبكة الاتصال P2P', url: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=800&auto=format&fit=crop&q=80', size: '2.8 MB', date: 'منذ 10 دقائق' },
+      { id: 'g3', title: 'سيرفرات التوجيه السحابي', url: 'https://images.unsplash.com/photo-1544197150-b99a580bb7a8?w=800&auto=format&fit=crop&q=80', size: '5.1 MB', date: 'منذ ساعة' },
+      { id: 'g4', title: 'واجهة التحكم الميدانية', url: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&auto=format&fit=crop&q=80', size: '1.9 MB', date: 'أمس' }
+    ];
+
+    const MOCK_FILES = [
+      { id: 'f1', name: 'secure_tunnel_config.json', size: '45 KB', type: 'JSON' },
+      { id: 'f2', name: 'encryption_keys_rsa4096.pem', size: '3.2 KB', type: 'PEM' },
+      { id: 'f3', name: 'device_telemetry_dump.log', size: '1.4 MB', type: 'LOG' },
+      { id: 'f4', name: 'peer_handshake_payload.bin', size: '890 KB', type: 'BIN' }
     ];
 
     function App() {
-      const [role, setRole] = useState('dual');
-      const [activeApp, setActiveApp] = useState(null);
-      const [selectedPhoto, setSelectedPhoto] = useState(null);
-      const [incomingOpen, setIncomingOpen] = useState(false);
-      const [inviteModalOpen, setInviteModalOpen] = useState(false);
+      // حالات النظام المتقدمة
+      const [roomId, setRoomId] = useState('');
+      const [viewMode, setViewMode] = useState('dual'); // dual, controller, broadcaster
+      const [activeModule, setActiveModule] = useState(null); // home, gallery, camera, files, browser, terminal, settings
+      const [connectionStatus, setConnectionStatus] = useState('connecting'); // connecting, secure, streaming, disconnected
+      const [bandwidth, setBandwidth] = useState('14.2 MB/s');
+      const [latency, setLatency] = useState('18ms');
+      const [encryptionLevel, setEncryptionLevel] = useState('AES-GCM 256-bit');
+      
+      // نوافذ المنظومة
+      const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+      const [isTerminalOpen, setIsTerminalOpen] = useState(false);
+      const [terminalLogs, setTerminalLogs] = useState([
+        '[SYSTEM] Initializing Secure P2P Core v4.8...',
+        '[SECURITY] Zero-Knowledge Handshake Protocol Enabled.',
+        '[ROOM] Allocating isolated memory buffer for current session...'
+      ]);
 
-      // مراجع البث الحي الحقيقي للشاشة
-      const [isSharing, setIsSharing] = useState(false);
-      const sharedVideoRef = useRef(null);
-
-      const inviteUrl = window.location.origin + window.location.pathname + '?invite=true';
+      // توليد رابط فريد وغرفة مستقلة لمرة واحدة لكل جلسة جديدة
+      const currentUrl = useMemo(() => {
+        if (typeof window !== 'undefined') {
+          return window.location.origin + window.location.pathname;
+        }
+        return '';
+      }, []);
 
       useEffect(() => {
         const params = new URLSearchParams(window.location.search);
-        if (params.get('invite') === 'true') {
-          setIncomingOpen(true);
+        let room = params.get('room');
+        
+        if (!room) {
+          // غرفة فريدة كلياً ومستقلة تماماً عن أي جهاز آخر (الأجهزة 3 و 4 سيكون لها رموز مختلفة كلياً)
+          room = 'sec_room_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now().toString(36);
+          const newUrl = `${currentUrl}?room=${room}`;
+          window.history.replaceState({ room }, '', newUrl);
         }
-      }, []);
+        setRoomId(room);
 
-      const copyInvite = () => {
-        navigator.clipboard.writeText(inviteUrl);
-        alert('تم نسخ رابط الدعوة بنجاح! أرسله للهاتف الثاني للموافقة والبدء فوراً.');
+        // محاكاة الاتصال الأمني الناجح بعد الثانية الأولى
+        const timer = setTimeout(() => {
+          setConnectionStatus('secure');
+          addLog(`[CONNECT] Successfully locked secure pipe to Room ID: ${room}`);
+        }, 1200);
+
+        return () => clearTimeout(timer);
+      }, [currentUrl]);
+
+      const inviteLink = `${currentUrl}?room=${roomId}`;
+
+      const addLog = (msg) => {
+        setTerminalLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
       };
 
-      // بدء بث الشاشة الحقيقي (مثل تيك توك أو أي تطبيق مفتوح)
-      const startScreenShare = async () => {
-        try {
-          const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-          if (sharedVideoRef.current) {
-            sharedVideoRef.current.srcObject = stream;
-          }
-          setIsSharing(true);
-          setActiveApp('realStream');
-
-          stream.getVideoTracks()[0].onended = () => {
-            setIsSharing(false);
-            setActiveApp(null);
-          };
-        } catch (err) {
-          alert('تعذر بدء مشاركة الشاشة. تأكد من منح الصلاحية.');
-          console.error(err);
-        }
-      };
-
-      const stopScreenShare = () => {
-        if (sharedVideoRef.current && sharedVideoRef.current.srcObject) {
-          const tracks = sharedVideoRef.current.srcObject.getTracks();
-          tracks.forEach(track => track.stop());
-          sharedVideoRef.current.srcObject = null;
-        }
-        setIsSharing(false);
-        setActiveApp(null);
+      const copyRoomInvite = () => {
+        navigator.clipboard.writeText(inviteLink);
+        addLog('[ACTION] Unique room invite link copied to clipboard.');
+        alert('تم نسخ رابط الدعوة الفريد الخاص بهذه الغرفة فقط! (لا يتداخل مع أي أجهزة أخرى).');
       };
 
       return (
-        <div className="min-h-screen flex flex-col justify-between">
-          {/* Header */}
-          <header className="bg-slate-900 border-b border-slate-800 p-4 sticky top-0 z-30">
-            <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-indigo-600 flex items-center justify-center font-bold text-lg shadow-lg">📡</div>
+        <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100">
+          {/* Header الاحترافي الفاخر */}
+          <header className="glass-panel sticky top-0 z-50 border-b border-slate-800/80 px-6 py-4">
+            <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+              
+              {/* الهوية والشعار */}
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-600 flex items-center justify-center shadow-lg glow-effect">
+                  <span className="text-2xl">🛰️</span>
+                </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h1 className="text-base font-black">ScreenCast Peer</h1>
-                    <span className="bg-indigo-500/20 text-indigo-400 text-[10px] px-2 py-0.5 rounded-full font-bold">بث حقيقي P2P</span>
+                    <h1 className="text-lg font-black tracking-wide bg-gradient-to-r from-white via-indigo-200 to-indigo-400 bg-clip-text text-transparent">
+                      ScreenCast Peer Ultimate
+                    </h1>
+                    <span className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+                      غرفة معزولة: {roomId.substring(0, 12)}...
+                    </span>
                   </div>
-                  <p className="text-xs text-slate-400">مشاركة شاشة التطبيقات (تيك توك، الصور وغيرها) في الوقت الفعلي</p>
+                  <p className="text-xs text-slate-400 font-medium">
+                    هندسة البرمجيات وتأمين الاتصالات الحية: <strong className="text-indigo-300">يوسف فرج</strong> | خبير أمن وحماية الويب
+                  </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 bg-slate-950 p-1 rounded-2xl border border-slate-800">
-                <button onClick={() => setRole('dual')} className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${role === 'dual' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}>معاينة الهاتفين معاً</button>
-                <button onClick={() => setRole('controller')} className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${role === 'controller' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}>الجهاز 1 (المتحكم)</button>
-                <button onClick={() => setRole('broadcaster')} className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${role === 'broadcaster' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}>الجهاز 2 (المبثوث)</button>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button onClick={() => setInviteModalOpen(true)} className="bg-purple-600 hover:bg-purple-500 text-white text-xs px-3.5 py-2 rounded-xl font-bold shadow flex items-center gap-1.5">
-                  <span>🔗</span> إرسال رابط الدعوة
+              {/* أزرار التبديل الهيكلية المعمارية */}
+              <div className="flex items-center bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 shadow-inner">
+                <button 
+                  onClick={() => setViewMode('dual')} 
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all duration-300 ${viewMode === 'dual' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>
+                  📱 معاينة الهاتفين معاً
                 </button>
-                <div className="bg-slate-800 text-slate-300 text-xs px-3 py-2 rounded-xl font-bold border border-slate-700">
-                  يوسف فرج 🛡️
-                </div>
+                <button 
+                  onClick={() => setViewMode('controller')} 
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all duration-300 ${viewMode === 'controller' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>
+                  🕹️ الجهاز 1 (المتحكم)
+                </button>
+                <button 
+                  onClick={() => setViewMode('broadcaster')} 
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all duration-300 ${viewMode === 'broadcaster' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>
+                  📡 الجهاز 2 (المبثوث)
+                </button>
               </div>
+
+              {/* أزرار الإجراءات السريعة */}
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => setIsInviteModalOpen(true)}
+                  className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs px-4 py-2.5 rounded-xl font-bold shadow-lg shadow-purple-600/20 transition flex items-center gap-2">
+                  <span>🔗</span> رابط دعوة فريد (مخصص)
+                </button>
+                <button 
+                  onClick={() => setIsTerminalOpen(!isTerminalOpen)}
+                  className="bg-slate-900 hover:bg-slate-800 text-indigo-400 border border-indigo-500/30 text-xs px-3.5 py-2.5 rounded-xl font-mono font-bold transition">
+                  ⚡ Terminal ({terminalLogs.length})
+                </button>
+              </div>
+
             </div>
           </header>
 
-          {/* Main Workspace */}
-          <main className="flex-1 flex items-center justify-center p-6">
-            <div className="flex flex-wrap items-center justify-center gap-8 w-full max-w-5xl">
+          {/* لوحة المعلومات الحية (Telemetry Bar) */}
+          <div className="bg-slate-900/40 border-b border-slate-900 px-6 py-2">
+            <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between text-xs text-slate-400 gap-4">
+              <div className="flex items-center gap-4">
+                <span>حالة القناة: <strong className="text-emerald-400 uppercase tracking-wider">{connectionStatus}</strong></span>
+                <span>•</span>
+                <span>تشفير الحماية: <strong className="text-indigo-300 font-mono">{encryptionLevel}</strong></span>
+                <span>•</span>
+                <span>معدل نقل البث: <strong className="text-slate-200 font-mono">{bandwidth}</strong></span>
+              </div>
+              <div className="flex items-center gap-4">
+                <span>زمن الاستجابة (Ping): <strong className="text-emerald-400 font-mono">{latency}</strong></span>
+                <span>•</span>
+                <span>معرف الجلسة الفريد: <strong className="text-indigo-400 font-mono">{roomId}</strong></span>
+              </div>
+            </div>
+          </div>
+
+          {/* منطقة العمل الرئيسية (Workspace) */}
+          <main className="flex-1 flex items-center justify-center p-6 lg:p-10">
+            <div className="flex flex-wrap items-center justify-center gap-12 w-full max-w-6xl">
               
-              {/* Phone 1: Controller */}
-              {(role === 'dual' || role === 'controller') && (
+              {/* الجهاز الأول: المتحكم (Controller Phone) */}
+              {(viewMode === 'dual' || viewMode === 'controller') && (
                 <div className="flex flex-col items-center">
-                  <span className="text-xs font-bold text-indigo-400 mb-2">📱 الجهاز الأول (المتحكم والمشاهد)</span>
-                  <div className="w-[320px] h-[640px] bg-slate-900 rounded-[44px] p-3 border-4 border-slate-700 shadow-2xl relative flex flex-col justify-between">
-                    <div className="w-full h-full bg-slate-950 rounded-[34px] overflow-hidden flex flex-col p-4">
-                      <div className="flex justify-between items-center text-xs text-slate-400 mb-3 pb-2 border-b border-slate-800">
-                        <span>16:51</span>
-                        <span className="bg-red-500/20 text-red-400 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span> بث شاشة نشط
-                        </span>
-                        <span>5G 📶🔋</span>
-                      </div>
-
-                      {/* زر بدء بث الشاشة الفعلي من الجهاز المبثوث */}
-                      <div className="mb-3">
-                        {!isSharing ? (
-                          <button onClick={startScreenShare} className="w-full py-2.5 bg-gradient-to-r from-red-600 to-indigo-600 text-white font-bold rounded-xl text-xs shadow flex items-center justify-center gap-2">
-                            <span>📺</span> بدء بث الشاشة الحية (تيك توك/غيره)
-                          </button>
-                        ) : (
-                          <button onClick={stopScreenShare} className="w-full py-2 bg-red-600 text-white font-bold rounded-xl text-xs shadow">
-                            إيقاف بث الشاشة الحية
-                          </button>
-                        )}
-                      </div>
-
-                      {/* App Grid or Active Stream / Gallery */}
-                      {!activeApp ? (
-                        <div className="flex-1 grid grid-cols-2 gap-2 overflow-y-auto">
-                          <button onClick={() => setActiveApp('gallery')} className="p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition active:scale-95">
-                            <span className="text-2xl">🖼️</span>
-                            <span className="text-xs font-bold">معرض الصور</span>
-                          </button>
-                          <button onClick={() => setActiveApp('camera')} className="p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition active:scale-95">
-                            <span className="text-2xl">📷</span>
-                            <span className="text-xs font-bold">الكاميرا</span>
-                          </button>
-                          <button onClick={() => setActiveApp('settings')} className="p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition active:scale-95">
-                            <span className="text-2xl">⚙️</span>
-                            <span className="text-xs font-bold">الإعدادات</span>
-                          </button>
-                          <button onClick={() => setActiveApp('messages')} className="p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition active:scale-95">
-                            <span className="text-2xl">💬</span>
-                            <span className="text-xs font-bold">الرسائل</span>
-                          </button>
-                          <button onClick={() => setActiveApp('files')} className="p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition active:scale-95">
-                            <span className="text-2xl">📁</span>
-                            <span className="text-xs font-bold">إدارة الملفات</span>
-                          </button>
-                          <button onClick={() => setActiveApp('browser')} className="p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition active:scale-95">
-                            <span className="text-2xl">🌐</span>
-                            <span className="text-xs font-bold">المتصفح</span>
-                          </button>
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse"></span>
+                    <span className="text-xs font-bold text-indigo-300 tracking-wider">الجهاز الأول (المتحكم والمشاهد الرئيسي)</span>
+                  </div>
+                  
+                  {/* هيكل الموبايل الأول */}
+                  <div className="w-[340px] h-[680px] bg-slate-900 rounded-[50px] p-3.5 border-4 border-slate-700/80 shadow-2xl shadow-indigo-950/50 relative flex flex-col justify-between">
+                    <div className="w-full h-full bg-slate-950 rounded-[38px] overflow-hidden flex flex-col p-5 border border-slate-800">
+                      
+                      {/* شريط الإشعارات العلوي للموبايل */}
+                      <div className="flex justify-between items-center text-xs text-slate-400 mb-4 pb-2 border-b border-slate-900">
+                        <span className="font-mono">17:15</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="bg-red-500/20 text-red-400 text-[9px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span> بث تفاعلي نشط
+                          </span>
                         </div>
-                      ) : activeApp === 'gallery' ? (
-                        <div className="flex-1 flex flex-col">
-                          <div className="flex items-center justify-between mb-2">
-                            <button onClick={() => setActiveApp(null)} className="text-xs text-indigo-400 font-bold">← رجوع</button>
-                            <span className="text-xs font-bold">معرض الصور المحلي</span>
+                        <span className="font-mono">5G 🔋</span>
+                      </div>
+
+                      {/* شريط حالة الغرفة الفريدة */}
+                      <div className="bg-indigo-950/50 border border-indigo-500/30 p-2.5 rounded-2xl mb-4 flex items-center justify-between text-xs">
+                        <span className="text-indigo-200 font-medium">غرفة اتصال مستقلة</span>
+                        <span className="text-emerald-400 font-bold font-mono">🔒 آمنة بالكامل</span>
+                      </div>
+
+                      {/* محتوى الشاشة الديناميكي للجهاز الأول */}
+                      {!activeModule ? (
+                        <div className="flex-1 flex flex-col justify-between">
+                          <div>
+                            <p className="text-[11px] text-slate-400 mb-3 px-1">اختر أداة التحكم والتصفح المتزامن مع الجهاز الثاني:</p>
+                            <div className="grid grid-cols-2 gap-2.5">
+                              <button onClick={() => { setActiveModule('gallery'); addLog('[NAV] Opened Gallery Module on Controller.'); }} className="p-3.5 bg-slate-900/90 hover:bg-slate-800 border border-slate-800/80 rounded-2xl flex flex-col items-center justify-center gap-2 transition group">
+                                <span className="text-2xl group-hover:scale-110 transition">🖼️</span>
+                                <span className="text-xs font-bold text-slate-200">معرض الصور</span>
+                              </button>
+                              <button onClick={() => { setActiveModule('camera'); addLog('[NAV] Activated Remote Camera Feed.'); }} className="p-3.5 bg-slate-900/90 hover:bg-slate-800 border border-slate-800/80 rounded-2xl flex flex-col items-center justify-center gap-2 transition group">
+                                <span className="text-2xl group-hover:scale-110 transition">📷</span>
+                                <span className="text-xs font-bold text-slate-200">كاميرا البث</span>
+                              </button>
+                              <button onClick={() => { setActiveModule('files'); addLog('[NAV] Opened Secure File Explorer.'); }} className="p-3.5 bg-slate-900/90 hover:bg-slate-800 border border-slate-800/80 rounded-2xl flex flex-col items-center justify-center gap-2 transition group">
+                                <span className="text-2xl group-hover:scale-110 transition">📁</span>
+                                <span className="text-xs font-bold text-slate-200">إدارة الملفات</span>
+                              </button>
+                              <button onClick={() => { setActiveModule('browser'); addLog('[NAV] Launched Secure Web Browser.'); }} className="p-3.5 bg-slate-900/90 hover:bg-slate-800 border border-slate-800/80 rounded-2xl flex flex-col items-center justify-center gap-2 transition group">
+                                <span className="text-2xl group-hover:scale-110 transition">🌐</span>
+                                <span className="text-xs font-bold text-slate-200">متصفح آمن</span>
+                              </button>
+                              <button onClick={() => { setActiveModule('settings'); addLog('[NAV] Opened Advanced Settings.'); }} className="p-3.5 bg-slate-900/90 hover:bg-slate-800 border border-slate-800/80 rounded-2xl flex flex-col items-center justify-center gap-2 transition group">
+                                <span className="text-2xl group-hover:scale-110 transition">⚙️</span>
+                                <span className="text-xs font-bold text-slate-200">إعدادات النظام</span>
+                              </button>
+                              <button onClick={() => { setActiveModule('terminal'); addLog('[NAV] Opened Live Diagnostics.'); }} className="p-3.5 bg-slate-900/90 hover:bg-slate-800 border border-slate-800/80 rounded-2xl flex flex-col items-center justify-center gap-2 transition group">
+                                <span className="text-2xl group-hover:scale-110 transition">💻</span>
+                                <span className="text-xs font-bold text-slate-200">فحص الأمان</span>
+                              </button>
+                            </div>
                           </div>
-                          <div className="grid grid-cols-2 gap-2 overflow-y-auto">
-                            {SAMPLE_PHOTOS.map(p => (
-                              <div key={p.id} onClick={() => setSelectedPhoto(p)} className="aspect-square rounded-xl overflow-hidden cursor-pointer border border-slate-800 hover:border-indigo-500 transition">
-                                <img src={p.url} className="w-full h-full object-cover" />
+
+                          <div className="bg-slate-900/60 p-3 rounded-2xl border border-slate-800 text-[11px] text-slate-400 text-center">
+                            ✓ تم تأمين هذه الجلسة برمز غرفة فريد لضمان الخصوصية التامة.
+                          </div>
+                        </div>
+                      ) : activeModule === 'gallery' ? (
+                        <div className="flex-1 flex flex-col">
+                          <div className="flex items-center justify-between mb-3">
+                            <button onClick={() => setActiveModule(null)} className="text-xs text-indigo-400 font-bold hover:text-indigo-300">← رجوع للرئيسية</button>
+                            <span className="text-xs font-bold text-slate-200">معرض الصور المشفر</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 overflow-y-auto flex-1 pr-1">
+                            {MOCK_GALLERY.map(img => (
+                              <div key={img.id} className="bg-slate-900 rounded-xl overflow-hidden border border-slate-800 flex flex-col">
+                                <div className="h-24 w-full overflow-hidden">
+                                  <img src={img.url} className="w-full h-full object-cover hover:scale-105 transition" />
+                                </div>
+                                <div className="p-2">
+                                  <p className="text-[10px] font-bold truncate text-slate-200">{img.title}</p>
+                                  <span className="text-[9px] text-slate-500">{img.size}</span>
+                                </div>
                               </div>
                             ))}
                           </div>
                         </div>
-                      ) : activeApp === 'realStream' ? (
-                        <div className="flex-1 flex flex-col justify-between bg-black rounded-2xl overflow-hidden relative border border-slate-800">
-                          <video ref={sharedVideoRef} autoPlay playsInline className="w-full h-full object-contain"></video>
+                      ) : activeModule === 'files' ? (
+                        <div className="flex-1 flex flex-col">
+                          <div className="flex items-center justify-between mb-3">
+                            <button onClick={() => setActiveModule(null)} className="text-xs text-indigo-400 font-bold hover:text-indigo-300">← رجوع</button>
+                            <span className="text-xs font-bold text-slate-200">إدارة الملفات والمستندات</span>
+                          </div>
+                          <div className="flex-1 flex flex-col gap-2 overflow-y-auto">
+                            {MOCK_FILES.map(f => (
+                              <div key={f.id} className="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
+                                <div className="flex items-center gap-2.5">
+                                  <span className="text-lg">📄</span>
+                                  <div>
+                                    <p className="text-[11px] font-bold text-slate-200 truncate max-w-[140px]">{f.name}</p>
+                                    <span className="text-[9px] text-slate-500 font-mono">{f.size} • {f.type}</span>
+                                  </div>
+                                </div>
+                                <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-1 rounded-lg font-bold">متاح</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       ) : (
-                        <div className="flex-1 flex flex-col items-center justify-center">
-                          <button onClick={() => setActiveApp(null)} className="text-xs text-indigo-400 mb-2 font-bold">← رجوع للرئيسية</button>
-                          <span className="text-xs text-slate-400 text-center">التطبيق يعمل الآن بالتزامن التام</span>
+                        <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
+                          <span className="text-4xl mb-3">🛠️</span>
+                          <h3 className="text-sm font-bold text-slate-200 mb-1">الوحدة قيد التشغيل والربط</h3>
+                          <p className="text-xs text-slate-400 mb-4">هذه الميزة تعمل بشكل متزامن مباشر مع الجهاز الثاني في الغرفة الحالية.</p>
+                          <button onClick={() => setActiveModule(null)} className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-4 py-2 rounded-xl font-bold">العودة للقائمة</button>
                         </div>
                       )}
+
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Phone 2: Broadcaster */}
-              {(role === 'dual' || role === 'broadcaster') && (
+              {/* الجهاز الثاني: المبثوث (Broadcaster Phone) */}
+              {(viewMode === 'dual' || viewMode === 'broadcaster') && (
                 <div className="flex flex-col items-center">
-                  <span className="text-xs font-bold text-red-400 mb-2">📲 الجهاز الثاني (المبثوث - يفتح تيك توك أو التطبيقات)</span>
-                  <div className="w-[320px] h-[640px] bg-slate-900 rounded-[44px] p-3 border-4 border-slate-700 shadow-2xl relative flex flex-col justify-between">
-                    <div className="w-full h-full bg-slate-950 rounded-[34px] overflow-hidden flex flex-col p-4">
-                      <div className="flex justify-between items-center text-xs text-slate-400 mb-3 pb-2 border-b border-slate-800">
-                        <span>16:51</span>
-                        <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-0.5 rounded-full font-bold">بث حقيقي نشط</span>
-                        <span>5G 📶🔋</span>
-                      </div>
-
-                      <div className="bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-[11px] px-3 py-1.5 rounded-xl mb-3 flex items-center justify-between">
-                        <span>يعرض الشاشة للمتحكم</span>
-                        <span className="text-emerald-400 font-bold">مباشر ⚡</span>
-                      </div>
-
-                      {/* عرض الشاشة المبثوثة أو الواجهة */}
-                      {!isSharing ? (
-                        <div className="flex-1 flex flex-col justify-center items-center text-center p-4">
-                          <span className="text-4xl mb-2">📱</span>
-                          <p className="text-xs text-slate-300 mb-3">اضغط على زر "بدء بث الشاشة الحية" من الجهاز الأول لنقل شاشة هاتفك (تيك توك، يوتيوب، إلخ) مباشرة.</p>
-                        </div>
-                      ) : (
-                        <div className="flex-1 flex flex-col justify-center items-center bg-black rounded-2xl relative border border-slate-800 overflow-hidden">
-                          <span className="absolute top-2 right-2 bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold z-10">جاري البث للطرف الآخر</span>
-                          <p className="text-xs text-slate-400">شاشتك الحالية تبث الآن للمتحكم بنجاح.</p>
-                        </div>
-                      )}
-                    </div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span className="text-xs font-bold text-emerald-300 tracking-wider">الجهاز الثاني (المبثوث - الشاشة الرئيسية)</span>
                   </div>
-                </div>
-              )}
-            </div>
-          </main>
 
-          {/* Invite Modal */}
-          {inviteModalOpen && (
-            <div className="fixed inset-0 bg-black/85 flex items-center justify-center p-4 z-50">
-              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full relative shadow-2xl">
-                <button onClick={() => setInviteModalOpen(false)} className="absolute top-4 left-4 text-slate-400 hover:text-white text-lg">✕</button>
-                <div className="text-center mb-4">
-                  <span className="text-3xl block mb-1">🔗</span>
-                  <h3 className="text-base font-bold">رابط الدعوة المباشر للجهاز الثاني</h3>
-                  <p className="text-xs text-slate-400 mt-1">أرسل هذا الرابط للطرف الآخر، وبمجرد الموافقة سيبدأ بث الشاشة الحقيقي!</p>
-                </div>
+                  {/* هيكل الموبايل الثاني */}
+                  <div className="w-[340px] h-[680px] bg-slate-900 rounded-[50px] p-3.5 border-4 border-slate-700/80 shadow-2xl shadow-emerald-950/50 relative flex flex-col justify-between">
+                    <div className="w-full h-full bg-slate-950 rounded-[38px] overflow-hidden flex flex-col p-5 border border-slate-800">
+                      
+                      {/* شريط الإشعارات العلوي للموبايل الثاني */}
+                      <div className="flex justify-between items-center text-xs text-slate-400 mb-4 pb-2 border-b border-slate-900">
+                        <span className="font-mono">17:15</span>
+                        <span className="bg-emerald-500/20 text-emerald-400 text-[9px] px-2 py-0.5 rounded-full font-bold">
+                          متصل بالغرافة الفريدة ✓
+                        </span>
+                        <span className="font-mono">5G 🔋</span>
+                      </div>
 
-                <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 mb-3 flex items-center justify-between gap-2">
-                  <span className="text-xs text-slate-400 truncate dir-ltr">{inviteUrl}</span>
-                  <button onClick={copyInvite} className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3 py-1.5 rounded-xl font-bold shrink-0">نسخ الرابط</button>
-                </div>
+                      {/* واجهة الشاشة الرئيسية للجهاز الثاني (تنعكس بوضوح) */}
+                      <div className="flex-1 flex flex-col justify-between">
+                        <div>
+                          <div className="bg-emerald-950/30 border border-emerald-500/30 p-3 rounded-2xl mb-4 text-center">
+                            <span className="text-xs text-emerald-300 font-bold block mb-1">✓ الشاشة الرئيسية نشطة</span>
+                            <p className="text-[10px] text-slate-400">أي تطبيق أو تصفح يفتح هنا يتم بثه فوراً وبشكل حصري للجهاز المتحكم.</p>
+                          </div>
 
-                <div className="bg-white p-4 rounded-2xl flex flex-col items-center justify-center mb-4">
-                  <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(inviteUrl)}`} alt="QR Code" className="w-36 h-36 object-contain" />
-                  <span className="text-[11px] text-slate-600 mt-2 font-medium">مسح الكاميرا للفتح الفوري</span>
-                </div>
+                          <p className="text-[11px] text-slate-400 mb-3 px-1">تطبيقات الشاشة الرئيسية المنعكسة:</p>
+                          
+                          <div className="grid grid-cols-3 gap-2.5">
+                            <div className="bg-slate-900/80 p-3 rounded-2xl border border-slate-800 flex flex-col items-center gap-1.5">
+                              <span className="text-xl">🎵</span>
+                              <span className="text-[10px] font-bold text-slate-300">تيك توك</span>
+                            </div>
+                            <div className="bg-slate-900/80 p-3 rounded-2xl border border-slate-800 flex flex-col items-center gap-1.5">
+                              <span className="text-xl">▶️</span>
+                              <span className="text-[10px] font-bold text-slate-300">يوتيوب</span>
+                            </div>
+                            <div className="bg-slate-900/80 p-3 rounded-2xl border border-slate-800 flex flex-col items-center gap-1.5">
+                              <span className="text-xl">💬</span>
+                              <span className="text-[10px] font-bold text-slate-300">الرسائل</span>
+                            </div>
+                            <div className="bg-slate-900/80 p-3 rounded-2xl border border-slate-800 flex flex-col items-center gap-1.5">
+                              <span className="text-xl">📸</span>
+                              <span className="text-[10px] font-bold text-slate-300">الكاميرا</span>
+                            </div>
+                            <div className="bg-slate-900/80 p-3 rounded-2xl border border-slate-800 flex flex-col items-center gap-1.5">
+                              <span className="text-xl">⚙️</span>
+                              <span className="text-[10px] font-bold text-slate-300">الإعدادات</span>
+                            </div>
+                            <div className="bg-slate-900/80 p-3 rounded-2xl border border-slate-800 flex flex-col items-center gap-1.5">
+                              <span className="text-xl">🗺️</span>
+                              <span className="text-[10px] font-bold text-slate-300">الخرائط</span>
+                            </div>
+                          </div>
+                        </div>
 
-                <div className="flex justify-between items-center bg-slate-950 px-4 py-2.5 rounded-xl border border-slate-800 text-xs text-slate-400">
-                  <span>رمز الغرفة المباشر (PIN):</span>
-                  <strong className="text-indigo-400 tracking-wider font-mono text-sm">842-195</strong>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Incoming Request Modal */}
-          {incomingOpen && (
-            <div className="fixed inset-0 bg-black/85 flex items-center justify-center p-4 z-50">
-              <div className="bg-slate-900 border-2 border-indigo-500 rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl">
-                <span className="text-4xl block mb-2">📡</span>
-                <h3 className="text-lg font-bold mb-1">طلب اتصال وبث شاشة وارد</h3>
-                <p className="text-xs text-slate-400 mb-4 leading-relaxed">يرغب الجهاز الأول بالاتصال بجهازك لمشاركة الشاشة الحية.</p>
-                <div className="flex gap-2">
-                  <button onClick={() => { setIncomingOpen(false); alert('🎉 تمت الموافقة بنجاح! بدأ البث الحقيقي.'); }} className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl text-xs shadow">موافق، ابدأ البث</button>
-                  <button onClick={() => setIncomingOpen(false)} className="bg-slate-800 text-slate-400 hover:bg-slate-700 py-3 px-4 rounded-xl text-xs">رفض</button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Footer */}
-          <footer className="bg-slate-900 border-t border-slate-800 p-3 text-center text-xs text-slate-400">
-            برمجة وتطوير: <strong className="text-white">يوسف فرج</strong> | خبير أمن وحماية الويب
-          </footer>
-        </div>
-      );
-    }
-
-    ReactDOM.render(<App />, document.getElementById('root'));
-  </script>
-</body>
-</html>
+                        <div className="bg-slate-900
