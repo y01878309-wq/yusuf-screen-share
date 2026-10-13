@@ -3,12 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ScreenCast PeerJS Live Mirror | يوسف فرج</title>
+  <title>ScreenCast Manual Connect Link | يوسف فرج</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <!-- مكتبة PeerJS للاتصال الحقيقي المباشر بين الأجهزة عبر الإنترنت -->
   <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap');
@@ -24,64 +23,43 @@
     const { useState, useEffect, useRef } = React;
 
     function App() {
-      const [roomId, setRoomId] = useState('');
-      const [peerId, setPeerId] = useState('جاري الاتصال بالشبكة...');
-      const [remotePeerId, setRemotePeerId] = useState('');
-      const [connectionStatus, setConnectionStatus] = useState('في انتظار الانضمام للغرفة...');
+      const [myId, setMyId] = useState('جاري توليد الكود...');
+      const [targetId, setTargetId] = useState('');
+      const [connectionStatus, setConnectionStatus] = useState('في انتظار الاتصال بالمكتبة...');
       const [isStreaming, setIsStreaming] = useState(false);
 
       const peerRef = useRef(null);
       const localStreamRef = useRef(null);
       const localVideoRef = useRef(null);
       const remoteVideoRef = useRef(null);
-      const currentCallRef = useRef(null);
 
       useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        let currentRoom = params.get('room');
-        
-        if (!currentRoom) {
-          currentRoom = 'youssef_room_' + Math.random().toString(36).substring(2, 8);
-          const newUrl = window.location.origin + window.location.pathname + '?room=' + currentRoom;
-          window.history.replaceState({ room: currentRoom }, '', newUrl);
-        }
-        setRoomId(currentRoom);
-
-        // إنشاء كينونة PeerJS باستخدام معرف الغرفة لضمان اتصال الجهازين ببعض
-        const peer = new Peer(currentRoom, {
+        // إنشاء كينونة PeerJS بمعرف عشوائي فريد لكل تليفون بدون تضارب
+        const peer = new Peer({
           config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }] }
         });
 
         peer.on('open', (id) => {
-          setPeerId(id);
-          setConnectionStatus('متصل بشبكة الإشارة وجاهز للبث');
+          setMyId(id);
+          setConnectionStatus('متصل وجاهز. شارك كود هاتفك أو اكتب كود الطرف الآخر.');
         });
 
-        // استقبال المكالمة والبث من الجهاز الآخر تلقائياً
+        // استقبال الاتصال وبث الشاشة تلقائياً لو حد اتصل بك
         peer.on('call', (call) => {
-          setConnectionStatus('جاري استلام البث الشاشي من الجهاز الثاني...');
-          navigator.mediaDevices.getUserMedia({ video: true, audio: true }).catch(() => null).then(() => {
-            call.answer(); // الرد على المكالمة بدون كاميرا محلية للمستقبل
-            call.on('stream', (remoteStream) => {
-              if (remoteVideoRef.current) {
-                remoteVideoRef.current.srcObject = remoteStream;
-                setConnectionStatus('✓ الشاشة الرئيسية معروضة بنجاح وبث مباشر نشط!');
-                setIsStreaming(true);
-              }
-            });
+          setConnectionStatus('جاري استقبال البث من الجهاز الآخر...');
+          call.answer(); // الرد على الاتصال
+          call.on('stream', (remoteStream) => {
+            if (remoteVideoRef.current) {
+              remoteVideoRef.current.srcObject = remoteStream;
+              setConnectionStatus('✓ تم عرض الشاشة الرئيسية بنجاح!');
+              setIsStreaming(true);
+            }
           });
-          currentCallRef.current = call;
         });
 
         peer.on('error', (err) => {
           console.error(err);
-          // إذا كان معرف الغرفة مأخوذ (الجهاز الأول موجود)، نحاول الاتصال به كعميل
-          if (err.type === 'unavailable-id') {
-            setConnectionStatus('الغرفة نشطة بالفعل، جاري الاتصال بالجهاز المُضيف...');
-            connectToHost(currentRoom);
-          } else {
-            setConnectionStatus('خطأ في الشبكة: ' + err.type);
-          }
+          setConnectionStatus('خطأ في الشبكة: ' + err.type);
         });
 
         peerRef.current = peer;
@@ -91,10 +69,14 @@
         };
       }, []);
 
-      // الاتصال بالمضيف (الجهاز الأول)
-      const connectToHost = (hostId) => {
-        const peer = peerRef.current;
-        if (!peer) return;
+      // دالة الاتصال بالجهاز الآخر باستخدام الكود الخاص به
+      const connectToTarget = () => {
+        if (!targetId.trim()) {
+          alert('يرجى كتابة كود الجهاز الثاني أولاً!');
+          return;
+        }
+
+        setConnectionStatus('جاري طلب الاتصال بشاشة الجهاز الآخر...');
 
         navigator.mediaDevices.getDisplayMedia({ video: { cursor: "always" }, audio: true }).then((stream) => {
           localStreamRef.current = stream;
@@ -102,9 +84,9 @@
             localVideoRef.current.srcObject = stream;
           }
 
-          setConnectionStatus('جاري إرسال الشاشة الرئيسية للجهاز الآخر...');
-          const call = peer.call(hostId, stream);
-          
+          const peer = peerRef.current;
+          const call = peer.call(targetId.trim(), stream);
+
           call.on('stream', (remoteStream) => {
             if (remoteVideoRef.current) {
               remoteVideoRef.current.srcObject = remoteStream;
@@ -112,42 +94,14 @@
           });
 
           setIsStreaming(true);
-          setConnectionStatus('✓ تم بدء بث الشاشة الرئيسية بنجاح!');
+          setConnectionStatus('✓ تم ربط الشاشة وإرسال البث بنجاح!');
 
           stream.getVideoTracks()[0].onended = () => {
             stopBroadcast();
           };
         }).catch(err => {
           console.error(err);
-          setConnectionStatus('تم إلغاء إذن مشاركة الشاشة.');
-        });
-      };
-
-      // بدء مشاركة الشاشة يدوياً لمن يفتح الرابط
-      const startManualBroadcast = () => {
-        const params = new URLSearchParams(window.location.search);
-        let hostId = params.get('room');
-        // إذا كان هناك جهاز آخر نتصل به، أو نبدأ كمضيف وننتظر
-        navigator.mediaDevices.getDisplayMedia({ video: { cursor: "always" }, audio: true }).then((stream) => {
-          localStreamRef.current = stream;
-          if (localVideoRef.current) {
-            localVideoRef.current.srcObject = stream;
-          }
-          setIsStreaming(true);
-          setConnectionStatus('✓ شاشتك قيد البث وجاهزة للظهور عند الطرف الآخر.');
-
-          // لو فيه شخص متصل بينا نبعتله البث
-          if (peerRef.current) {
-            peerRef.current.on('call', (call) => {
-              call.answer(stream);
-            });
-          }
-
-          stream.getVideoTracks()[0].onended = () => {
-            stopBroadcast();
-          };
-        }).catch(err => {
-          alert('يرجى السماح بمشاركة الشاشة لبدء البث.');
+          setConnectionStatus('فشل البدء أو تم إلغاء إذن الشاشة.');
         });
       };
 
@@ -160,11 +114,9 @@
         setConnectionStatus('تم إيقاف البث.');
       };
 
-      const inviteUrl = window.location.origin + window.location.pathname + '?room=' + roomId;
-
-      const copyInvite = () => {
-        navigator.clipboard.writeText(inviteUrl);
-        alert('تم نسخ رابط الغرفة الفريدة بنجاح!');
+      const copyMyId = () => {
+        navigator.clipboard.writeText(myId);
+        alert('تم نسخ كود هاتفك بنجاح! ابعته للجهاز التاني.');
       };
 
       return (
@@ -178,17 +130,17 @@
                   🛰️
                 </div>
                 <div>
-                  <h1 className="text-sm font-black text-white">ScreenCast PeerJS Live Mirror</h1>
+                  <h1 className="text-sm font-black text-white">ScreenCast Manual Connect</h1>
                   <p className="text-xs text-slate-400">هندسة: <strong className="text-indigo-300">يوسف فرج</strong></p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                <span className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs px-3 py-1.5 rounded-full font-bold">
-                  الغرفة: {roomId}
-                </span>
-                <button onClick={copyInvite} className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-4 py-2 rounded-xl font-bold shadow">
-                  🔗 نسخ الرابط
+              {/* كود هاتفك وزر النسخ */}
+              <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl">
+                <span className="text-[11px] text-slate-400">كود هاتفك:</span>
+                <span className="text-xs font-mono text-emerald-400 font-bold">{myId}</span>
+                <button onClick={copyMyId} className="bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] px-2.5 py-1 rounded-lg font-bold">
+                  نسخ الكود
                 </button>
               </div>
             </div>
@@ -196,49 +148,62 @@
 
           {/* Status Bar */}
           <div className="bg-slate-900/60 border-b border-slate-900 px-6 py-2">
-            <div className="max-w-7xl mx-auto flex items-center justify-between text-xs font-mono text-slate-400">
-              <div>حالة الاتصال الفعلي: <strong className="text-emerald-400">{connectionStatus}</strong></div>
-              <div>معرف الجهاز: <strong className="text-indigo-300">{peerId}</strong></div>
+            <div className="max-w-7xl mx-auto text-xs font-mono text-slate-400 text-center">
+              حالة الاتصال: <strong className="text-emerald-400">{connectionStatus}</strong>
             </div>
           </div>
 
           {/* Main Workspace */}
-          <main className="flex-1 flex items-center justify-center p-6">
+          <main className="flex-1 flex flex-col items-center justify-center p-6 gap-6">
+            
+            {/* خانة إدخال كود الجهاز الثاني للربط */}
+            <div className="w-full max-w-xl bg-slate-900 border border-slate-800 p-4 rounded-2xl flex flex-col sm:flex-row gap-3 shadow-xl">
+              <input 
+                type="text" 
+                placeholder="حط هنا كود الجهاز الثاني لتتصل به..." 
+                value={targetId}
+                onChange={(e) => setTargetId(e.target.value)}
+                className="flex-1 bg-slate-950 border border-slate-800 px-4 py-2.5 rounded-xl text-xs text-white font-mono focus:outline-none focus:border-indigo-500"
+              />
+              <button 
+                onClick={connectToTarget}
+                className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-6 py-2.5 rounded-xl font-bold transition shadow-lg">
+                🔗 اتصال وبدء العرض
+              </button>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 w-full max-w-5xl">
               
-              {/* شاشة هاتفك (المرسل) */}
+              {/* شاشة هاتفك (المصدر) */}
               <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 flex flex-col shadow-xl">
                 <div className="flex justify-between items-center mb-3">
                   <span className="text-xs font-bold text-indigo-400">📱 شاشة هاتفك (المصدر للبث)</span>
                   <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse"></span>
                 </div>
 
-                <div className="w-full h-[360px] bg-black rounded-2xl overflow-hidden relative border border-slate-800 flex items-center justify-center">
+                <div className="w-full h-[320px] bg-black rounded-2xl overflow-hidden relative border border-slate-800 flex items-center justify-center">
                   <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-contain"></video>
                   {!isStreaming && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 p-6 text-center">
                       <span className="text-4xl mb-3">📡</span>
-                      <p className="text-xs text-slate-300 mb-4">اضغط هنا لبدء بث شاشتك الحقيقية لتظهر مباشرة عند الجهاز الثاني.</p>
-                      <button onClick={startManualBroadcast} className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-6 py-3 rounded-xl font-bold shadow-lg transition">
-                        بدء بث الشاشة الحقيقي
-                      </button>
+                      <p className="text-xs text-slate-300">ضع كود الجهاز الآخر في الخانة بالأعلى واضغط "اتصال وبدء العرض" لتظهر شاشتك عنده.</p>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* الشاشة الرئيسية المستقبلة (التي تعرض تليفون الطرف الآخر) */}
+              {/* الشاشة الرئيسية (تستقبل شاشة الطرف الآخر) */}
               <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 flex flex-col shadow-xl">
                 <div className="flex justify-between items-center mb-3">
                   <span className="text-xs font-bold text-emerald-400">💻 الشاشة الرئيسية (تظهر هنا شاشة الطرف الآخر)</span>
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
                 </div>
 
-                <div className="w-full h-[360px] bg-black rounded-2xl overflow-hidden relative border border-slate-800 flex items-center justify-center">
+                <div className="w-full h-[320px] bg-black rounded-2xl overflow-hidden relative border border-slate-800 flex items-center justify-center">
                   <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-contain"></video>
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 p-6 text-center pointer-events-none">
                     <span className="text-4xl mb-3">🖥️</span>
-                    <p className="text-xs text-slate-400">ستظهر شاشة الهاتف الرئيسي للطرف الآخر هنا فور اتصاله بالغرفة.</p>
+                    <p className="text-xs text-slate-400">ستظهر الشاشة الرئيسية للجهاز الثاني هنا فور اتصاله بك.</p>
                   </div>
                 </div>
               </div>
