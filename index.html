@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ScreenCast Peer | يوسف فرج - مطور برمجيات وخبير أمن وحماية الويب</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; background-color: #020617; }
+  </style>
+</head>
+<body class="bg-slate-950 text-white min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const SAMPLE_PHOTOS = [
+      { id: '1', title: 'غروب الشمس على الشاطئ', url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&auto=format&fit=crop&q=80', date: 'أمس، 06:45 م' },
+      { id: '2', title: 'لقطة معمارية حديثة', url: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&auto=format&fit=crop&q=80', date: '10 أكتوبر' },
+      { id: '3', title: 'قهوة الصباح والعمل', url: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=800&auto=format&fit=crop&q=80', date: '08 أكتوبر' },
+      { id: '4', title: 'رحلة الجبال الثلجية', url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800&auto=format&fit=crop&q=80', date: '03 أكتوبر' },
+    ];
+
+    function App() {
+      const [role, setRole] = useState('dual');
+      const [activeApp, setActiveApp] = useState(null);
+      const [selectedPhoto, setSelectedPhoto] = useState(null);
+      const [incomingOpen, setIncomingOpen] = useState(false);
+
+      const inviteUrl = window.location.origin + window.location.pathname + '?invite=true';
+
+      useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('invite') === 'true') {
+          setIncomingOpen(true);
+        }
+      }, []);
+
+      const copyInvite = () => {
+        navigator.clipboard.writeText(inviteUrl);
+        alert('تم نسخ رابط الدعوة بنجاح! أرسله للهاتف الثاني للموافقة والبدء فوراً.');
+      };
+
+      return (
+        <div className="min-h-screen flex flex-col justify-between">
+          {/* Header */}
+          <header className="bg-slate-900 border-b border-slate-800 p-4 sticky top-0 z-30">
+            <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-600 flex items-center justify-center font-bold text-lg shadow-lg">📡</div>
+                <div>
+                  <h1 className="text-base font-black">ScreenCast Peer</h1>
+                  <p className="text-xs text-slate-400">برمجة: يوسف فرج | خبير أمن وحماية الويب</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button onClick={() => setRole('dual')} className={`px-3 py-1.5 rounded-xl text-xs font-bold ${role === 'dual' ? 'bg-indigo-600' : 'bg-slate-800 text-slate-400'}`}>معاينة الهاتفين</button>
+                <button onClick={() => setRole('controller')} className={`px-3 py-1.5 rounded-xl text-xs font-bold ${role === 'controller' ? 'bg-indigo-600' : 'bg-slate-800 text-slate-400'}`}>الهاتف 1 (المتحكم)</button>
+                <button onClick={() => setRole('broadcaster')} className={`px-3 py-1.5 rounded-xl text-xs font-bold ${role === 'broadcaster' ? 'bg-indigo-600' : 'bg-slate-800 text-slate-400'}`}>الهاتف 2 (المبثوث)</button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button onClick={copyInvite} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3.5 py-2 rounded-xl font-bold shadow">🔗 نسخ رابط الدعوة</button>
+                <button onClick={() => setIncomingOpen(true)} className="bg-indigo-950 text-indigo-300 border border-indigo-500/30 text-xs px-3 py-2 rounded-xl font-bold">تجربة قبول الطلب</button>
+              </div>
+            </div>
+          </header>
+
+          {/* Main Workspace */}
+          <main className="flex-1 flex items-center justify-center p-6">
+            <div className="flex flex-wrap items-center justify-center gap-8 w-full max-w-5xl">
+              {/* Phone 1: Controller */}
+              {(role === 'dual' || role === 'controller') && (
+                <div className="flex flex-col items-center">
+                  <span className="text-xs font-bold text-indigo-400 mb-2">📱 الهاتف الأول (المتحكم والمشاهد)</span>
+                  <div className="w-[320px] h-[640px] bg-slate-900 rounded-[44px] p-3 border-4 border-slate-700 shadow-2xl relative flex flex-col justify-between">
+                    <div className="w-full h-full bg-slate-950 rounded-[34px] overflow-hidden flex flex-col p-4">
+                      <div className="flex justify-between items-center text-xs text-slate-400 mb-4 pb-2 border-b border-slate-800">
+                        <span>09:41</span>
+                        <span className="bg-red-500/20 text-red-400 text-[10px] px-2 py-0.5 rounded-full font-bold">🔴 بث مباشر نشط</span>
+                        <span>5G 🔋</span>
+                      </div>
+
+                      {/* App Content */}
+                      {!activeApp ? (
+                        <div className="flex-1 flex flex-col justify-between">
+                          <div className="grid grid-cols-3 gap-3">
+                            <button onClick={() => setActiveApp('gallery')} className="p-3 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col items-center gap-1 active:scale-95 transition">
+                              <span className="text-2xl">📸</span>
+                              <span className="text-xs">معرض الصور</span>
+                            </button>
+                            <button onClick={() => setActiveApp('messages')} className="p-3 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col items-center gap-1 active:scale-95 transition">
+                              <span className="text-2xl">💬</span>
+                              <span className="text-xs">الرسائل</span>
+                            </button>
+                            <button onClick={() => setActiveApp('settings')} className="p-3 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col items-center gap-1 active:scale-95 transition">
+                              <span className="text-2xl">⚙️</span>
+                              <span className="text-xs">الإعدادات</span>
+                            </button>
+                          </div>
+                          <p className="text-[11px] text-slate-500 text-center">اضغط على أي تطبيق لفتحه على الهاتف الآخر في الوقت الفعلي</p>
+                        </div>
+                      ) : activeApp === 'gallery' ? (
+                        <div className="flex-1 flex flex-col">
+                          <div className="flex items-center justify-between mb-2">
+                            <button onClick={() => setActiveApp(null)} className="text-xs text-indigo-400">← رجوع</button>
+                            <span className="text-xs font-bold">معرض الصور</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 overflow-y-auto">
+                            {SAMPLE_PHOTOS.map(p => (
+                              <div key={p.id} onClick={() => setSelectedPhoto(p)} className="aspect-square rounded-xl overflow-hidden cursor-pointer border border-slate-800">
+                                <img src={p.url} className="w-full h-full object-cover" />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex-1 flex flex-col items-center justify-center">
+                          <button onClick={() => setActiveApp(null)} className="text-xs text-indigo-400 mb-2">← رجوع للرئيسية</button>
+                          <span className="text-xs text-slate-400">التطبيق قيد العرض والمزامنة</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Phone 2: Broadcaster */}
+              {(role === 'dual' || role === 'broadcaster') && (
+                <div className="flex flex-col items-center">
+                  <span className="text-xs font-bold text-red-400 mb-2">📲 الهاتف الثاني (المبثوث)</span>
+                  <div className="w-[320px] h-[640px] bg-slate-900 rounded-[44px] p-3 border-4 border-slate-700 shadow-2xl relative flex flex-col justify-between">
+                    <div className="w-full h-full bg-slate-950 rounded-[34px] overflow-hidden flex flex-col p-4">
+                      <div className="flex justify-between items-center text-xs text-slate-400 mb-4 pb-2 border-b border-slate-800">
+                        <span>09:41</span>
+                        <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-0.5 rounded-full font-bold">متصل بـ الهاتف 1</span>
+                        <span>5G 🔋</span>
+                      </div>
+
+                      {/* Mirrored view */}
+                      {!activeApp ? (
+                        <div className="flex-1 flex flex-col justify-between">
+                          <div className="grid grid-cols-3 gap-3 opacity-90">
+                            <div className="p-3 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col items-center gap-1">
+                              <span className="text-2xl">📸</span>
+                              <span className="text-xs">الصور</span>
+                            </div>
+                            <div className="p-3 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col items-center gap-1">
+                              <span className="text-2xl">💬</span>
+                              <span className="text-xs">الرسائل</span>
+                            </div>
+                            <div className="p-3 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col items-center gap-1">
+                              <span className="text-2xl">⚙️</span>
+                              <span className="text-xs">الإعدادات</span>
+                            </div>
+                          </div>
+                          <div className="bg-emerald-950/40 border border-emerald-500/30 p-3 rounded-2xl text-[11px] text-emerald-300">
+                            ✓ البث المباشر نشط والتحكم مفعل بإذن صاحب الهاتف
+                          </div>
+                        </div>
+                      ) : activeApp === 'gallery' ? (
+                        <div className="flex-1 flex flex-col">
+                          <span className="text-xs font-bold mb-2">معرض الصور (معروض للمتحكم)</span>
+                          <div className="grid grid-cols-2 gap-2">
+                            {SAMPLE_PHOTOS.map(p => (
+                              <div key={p.id} className="aspect-square rounded-xl overflow-hidden border border-slate-800">
+                                <img src={p.url} className="w-full h-full object-cover" />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex-1 flex flex-col items-center justify-center">
+                          <span className="text-xs text-slate-400">التطبيق قيد العرض المباشر</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </main>
+
+          {/* Incoming Request Modal */}
+          {incomingOpen && (
+            <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+              <div className="bg-slate-900 border-2 border-indigo-500 rounded-3xl p-6 max-w-sm w-full text-center">
+                <span className="text-4xl block mb-2">📡</span>
+                <h3 className="text-lg font-bold mb-1">طلب اتصال وبث شاشة وارد</h3>
+                <p className="text-xs text-slate-400 mb-4 leading-relaxed">يرغب الهاتف الأول بالاتصال بجهازك لمشاركة الشاشة والمساعدة في الوقت الفعلي.</p>
+                <div className="flex gap-2">
+                  <button onClick={() => { setIncomingOpen(false); alert('🎉 تمت الموافقة بنجاح! بدأ البث والتحكم فوراً.'); }} className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl text-xs">موافق، ابدأ البث فوراً</button>
+                  <button onClick={() => setIncomingOpen(false)} className="bg-slate-800 text-slate-400 py-3 px-4 rounded-xl text-xs">رفض</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Footer */}
+          <footer className="bg-slate-900 border-t border-slate-800 p-3 text-center text-xs text-slate-400">
+            برمجة وتطوير: <strong className="text-white">يوسف فرج</strong> | مطور برمجيات وخبير أمن وحماية الويب
+          </footer>
+        </div>
+      );
+    }
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>
